@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js" integrity="sha512-r6rPgYyVsJZLIo7b65cyYzqskjiIrQWG8838dBmaKGz9nOkY7TIwIDwX7b7vFf98BvT9W9CsnKrcZgID+KBlTQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
     body { padding: 20px; text-align: center; background-color: #1e1e24; color: #fff; font-family: system-ui, sans-serif; }
     .container { max-width: 500px; margin: 0 auto; }
@@ -140,17 +140,20 @@
       hideBanner();
 
       if (!html5QrcodeScanner) {
+        // Enforce safe legacy config constraints to completely bypass experimental native tracking engine faults
         html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-          fps: 10, 
+          fps: 15, 
           qrbox: function(viewfinderWidth, viewfinderHeight) {
             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            return { width: Math.floor(minEdge * 0.65), height: Math.floor(minEdge * 0.65) };
+            return { width: Math.floor(minEdge * 0.7), height: Math.floor(minEdge * 0.7) };
           },
           aspectRatio: 1.0,
           rememberLastUsedCamera: true,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          // CRITICAL IPHONE FIX Applied Here:
-          useBarCodeDetectorIfSupported: false 
+          // CRITICAL COMPATIBILITY FLAGS: Stops browsers from freezing frame analysis passes
+          useBarCodeDetectorIfSupported: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: false
+          }
         }, false);
       }
       
