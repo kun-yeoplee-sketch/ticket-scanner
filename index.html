@@ -2,8 +2,8 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>High-Res QR Reader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Static QR File Reader Test</title>
   <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
   <style>
     body {
@@ -11,131 +11,116 @@
       text-align: center;
       background-color: #121212;
       color: #ffffff;
-      padding: 20px;
+      padding: 40px 20px;
       margin: 0;
     }
     .wrapper {
-      max-width: 640px; /* Widened to account for desktop camera layouts */
+      max-width: 500px;
       margin: 0 auto;
-    }
-    #reader {
-      width: 100%;
-      background: #000;
-      border: 2px solid #333 !important;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-    #reader video {
-      width: 100% !important;
-      height: auto !important;
-    }
-    #result-box {
-      margin-top: 20px;
-      padding: 15px;
       background-color: #1e1e1e;
-      border: 1px solid #444;
-      border-radius: 6px;
-      word-break: break-all;
-      font-size: 1.2rem;
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid #333;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
-    .label {
-      color: #888;
-      font-size: 0.9rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 5px;
+    input[type="file"] {
+      display: none;
     }
-    button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      font-size: 1rem;
+    .file-upload-btn {
+      display: inline-block;
+      padding: 14px 24px;
       background-color: #007bff;
       color: white;
-      border: none;
-      border-radius: 4px;
+      font-weight: bold;
+      border-radius: 6px;
       cursor: pointer;
+      margin: 20px 0;
+      font-size: 1.1rem;
+      transition: background 0.2s;
     }
-    button:hover {
+    .file-upload-btn:hover {
       background-color: #0056b3;
+    }
+    #result-box {
+      margin-top: 25px;
+      padding: 20px;
+      background-color: #262626;
+      border-radius: 6px;
+      border: 1px solid #444;
+      word-break: break-all;
+    }
+    #scanned-text {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #00ff66;
+      margin-top: 10px;
+    }
+    .label {
+      color: #aaa;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #error-text {
+      color: #ff5555;
+      font-size: 0.95rem;
+      margin-top: 10px;
+      display: none;
+      background: #3d2424;
+      padding: 10px;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
 
   <div class="wrapper">
-    <h2>QR Code Scanner (Desktop Optimized)</h2>
+    <h2>QR Static Image Tester</h2>
+    <p style="color: #aaa; font-size: 0.95rem;">Upload a crisp photo of your QR code to test engine capability without webcam stream interference.</p>
     
-    <div id="reader"></div>
+    <label for="qr-file-input" class="file-upload-btn">
+      Choose QR Code Photo
+    </label>
+    <input type="file" id="qr-file-input" accept="image/*">
     
     <div id="result-box">
-      <div class="label">Scanned Text Result</div>
-      <div id="scanned-text">Waiting for QR code...</div>
+      <div class="label">Engine Read Result</div>
+      <div id="scanned-text" style="color: #ffaa00;">No file selected yet</div>
+      <div id="error-text"></div>
     </div>
-
-    <button id="reset-btn" onclick="resetScanner()" style="display: none;">Scan Another Code</button>
   </div>
 
   <script>
-    let html5QrcodeScanner = null;
+    // Initialize the engine core directly in memory without UI rendering elements
+    const html5QrCode = new Html5Qrcode("qr-file-input");
 
-    window.onload = function() {
-      initScanner();
-    };
-
-    function initScanner() {
-      document.getElementById('scanned-text').innerText = "Waiting for QR code...";
-      document.getElementById('reset-btn').style.display = "none";
-
-      // Rebuilt using the low-level experimental config architecture to force desktop hardware settings
-      html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 20, // Bumbed up frame parsing cadence 
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          // Expanded target window to 80% to read smaller codes further back
-          return { width: Math.floor(minEdge * 0.80), height: Math.floor(minEdge * 0.80) };
-        },
-        rememberLastUsedCamera: true,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-        // Force high-definition constraint pipeline over web media parameters
-        videoConstraints: {
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 },
-          facingMode: "environment"
-        }
-      }, false);
+    document.getElementById('qr-file-input').addEventListener('change', e => {
+      if (e.target.files.length === 0) return;
       
-      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-
-      // Mutation Observer remains active to support iOS deployments cleanly
-      const observer = new MutationObserver(() => {
-        const iosVideo = document.querySelector('#reader video');
-        if (iosVideo) {
-          iosVideo.setAttribute('playsinline', 'true');
-          iosVideo.setAttribute('webkit-playsinline', 'true');
-          iosVideo.setAttribute('muted', 'true');
-          iosVideo.play().catch(() => {});
-          observer.disconnect();
-        }
-      });
-      observer.observe(document.getElementById('reader'), { childList: true, subtree: true });
-    }
-
-    function onScanSuccess(decodedText) {
-      document.getElementById('scanned-text').innerText = decodedText;
-      document.getElementById('reset-btn').style.display = "inline-block";
+      const imageFile = e.target.files[0];
+      const scannedTextDiv = document.getElementById('scanned-text');
+      const errorTextDiv = document.getElementById('error-text');
       
-      if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().catch(() => {});
-      }
-    }
+      // Update UI states
+      scannedTextDiv.innerText = "Processing image array...";
+      scannedTextDiv.style.color = "#ffaa00";
+      errorTextDiv.style.display = "none";
 
-    function onScanFailure(error) {
-      // Clean performance frame loop bypass
-    }
-
-    function resetScanner() {
-      initScanner();
-    }
+      // Feed the raw uncompressed blob file directly to the local parser
+      html5QrCode.scanFile(imageFile, true)
+        .then(decodedText => {
+          // SUCCESS: Clear errors and output the text directly
+          scannedTextDiv.innerText = decodedText;
+          scannedTextDiv.style.color = "#00ff66";
+        })
+        .catch(err => {
+          // FAILURE: The engine could not mathematically identify the markers
+          scannedTextDiv.innerText = "FAILED TO READ";
+          scannedTextDiv.style.color = "#ff5555";
+          errorTextDiv.innerText = "Engine Error Details: " + err;
+          errorTextDiv.style.display = "block";
+        });
+    });
   </script>
 
 </body>
