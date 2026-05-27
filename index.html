@@ -11,13 +11,16 @@
     input { background-color: #373746 !important; color: white !important; border: 1px solid #555 !important; }
     button { background-color: #007bff; border: none; font-weight: bold; }
     button:hover { background-color: #0056b3; }
-    .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
     
+    /* View State Control */
+    #home-view { display: block; }
     #scanner-view { display: none; }
     
-    #reader { width: 100%; max-width: 450px; margin: 0 auto 15px auto; border: 3px solid #333 !important; border-radius: 8px; background: #000; overflow: hidden; }
+    /* Scanner Layout */
+    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
     #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; }
     
+    /* UI Boxes & Buttons */
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
     .submit-btn:hover { background-color: #006699; }
@@ -28,18 +31,22 @@
     .back-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #616161; border: none; color: white; border-radius: 6px; display: block; }
     .back-btn:hover { background-color: #424242; }
     
+    /* Status Banner System */
     #status-banner { padding: 15px; font-weight: bold; border-radius: 6px; font-size: 1.2rem; margin: 15px 0; display: none; white-space: pre-line; }
     .bg-success { background-color: #2e7d32 !important; color: white; }
     .bg-error { background-color: #c62828 !important; color: white; }
     .bg-info { background-color: #1565c0 !important; color: white; }
     
+    /* Data Lists */
     ul { list-style-type: none; padding-left: 0; margin-bottom: 15px; }
     li { margin-bottom: 6px; border-bottom: 1px solid #3a3a4a; padding-bottom: 6px; font-size: 1.05rem; }
     .history-log-title { font-weight: bold; margin-top: 20px; margin-bottom: 5px; color: #aaa; font-size: 0.95rem; }
     .history-log-container { font-size: 0.9rem; line-height: 1.4; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcc77; white-space: pre-line; }
     
+    /* Branding Assets */
     .top-logo { max-width: 220px; width: 100%; height: auto; margin: 0 auto 20px auto; display: block; background: #ffffff; padding: 10px; border-radius: 8px; }
     .child-top-logo { max-width: 180px; width: 100%; height: auto; margin: 0 auto 15px auto; display: block; background: #ffffff; padding: 8px; border-radius: 6px; }
+    .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
   </style>
 </head>
 <body>
@@ -64,10 +71,12 @@
 
     <div id="scanner-view">
       <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="child-top-logo" alt="Rangitoto College Logo">
-      <h4 id="child-header-title">Live Scanner</h4>
+      <h4 id="child-header-title">Ticket Scanner</h4>
       <p style="font-size: 0.85rem; color: #aaa; margin-top: -10px;">Scanner: <strong id="active-scanner-label" style="color:#00ff66;">Unknown</strong></p>
       
-      <div id="reader"></div>
+      <div id="reader-wrapper">
+        <div id="reader"></div>
+      </div>
       
       <div id="status-banner"></div>
       
@@ -77,7 +86,7 @@
         <hr style="margin: 15px 0;">
         <div id="button-container"></div>
       </div>
-      
+
       <button id="close-scanner-btn" class="cancel-btn" onclick="switchViewToHome()">Exit Camera</button>
     </div>
   </main>
@@ -86,8 +95,9 @@
     let html5QrcodeScanner = null;
     let isCameraPaused = false;
     let activeTicket = null;
-    let googleWebAppUrl = "";
     let timeoutTracker = null;
+    let googleWebAppUrl = "";
+    let globalEventName = "Ticket Scanner";
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -103,13 +113,15 @@
 
       let savedUsher = localStorage.getItem('concert_usher_name');
       if (savedUsher) { document.getElementById('usher-name').value = savedUsher; }
-      
+
+      // Try fetching active event title dynamically from Google Sheets Web App
       fetch(googleWebAppUrl + "?action=getEventName")
         .then(res => res.json())
         .then(data => {
           if (data && data.eventName) {
-            document.getElementById('portal-title').innerText = data.eventName;
-            document.getElementById('child-header-title').innerText = data.eventName;
+            globalEventName = data.eventName.trim();
+            document.getElementById('portal-title').innerText = globalEventName;
+            document.getElementById('child-header-title').innerText = globalEventName;
           }
         }).catch(() => {});
     };
@@ -139,59 +151,62 @@
       document.getElementById('close-scanner-btn').style.display = "block";
       hideBanner();
 
-      if (!html5QrcodeScanner) {
-        html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-          fps: 15, 
-          qrbox: function(viewfinderWidth, viewfinderHeight) {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            return { width: Math.floor(minEdge * 0.7), height: Math.floor(minEdge * 0.7) };
-          },
-          aspectRatio: 1.0,
-          rememberLastUsedCamera: true,
-          useBarCodeDetectorIfSupported: false,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: false
-          }
-        }, false);
+      let wrapper = document.getElementById('reader-wrapper');
+      if (!document.getElementById('reader')) {
+        let readerDiv = document.createElement('div');
+        readerDiv.id = 'reader';
+        wrapper.appendChild(readerDiv);
       }
+
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+        fps: 15, 
+        qrbox: 250,
+        aspectRatio: 1.0,
+        rememberLastUsedCamera: true,
+        useBarCodeDetectorIfSupported: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: false }
+      }, false);
       
       html5QrcodeScanner.render(onScanSuccess, onScanFailure);
     }
 
+    function onScanFailure(error) {}
+
     function stopAndDestroyCamera() {
       isCameraPaused = true;
       if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().catch(() => {});
+        html5QrcodeScanner.clear().then(() => {
+          let reader = document.getElementById('reader');
+          if (reader) reader.remove();
+        }).catch(() => {
+          let reader = document.getElementById('reader');
+          if (reader) reader.remove();
+        });
       }
     }
 
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
-      isCameraPaused = true; 
+      stopAndDestroyCamera();
       
       document.getElementById('ticket-info-box').style.display = "none";
       document.getElementById('close-scanner-btn').style.display = "none";
       showBanner("Verifying with Google Sheets database...", "bg-info");
       
       timeoutTracker = setTimeout(() => {
-        showBanner("Network connection lag detected. Resetting camera stream interface...", "bg-error");
-        setTimeout(() => { isCameraPaused = false; hideBanner(); document.getElementById('close-scanner-btn').style.display = "block"; }, 3000);
+        showBanner("Network lag detected. Resetting interface stream interface...", "bg-error");
+        setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
       }, 25000);
       
-      executeDatabaseLookup(decodedText);
-    }
-
-    function onScanFailure(error) {}
-
-    function executeDatabaseLookup(ticketCode) {
+      // Execute lookup against Google Apps Script backend routing setup
       fetch(googleWebAppUrl, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ action: "check", ticketId: ticketCode })
+        body: JSON.stringify({ action: "checkTicketStatus", barcode: decodedText })
       })
       .then(() => {
-        fetch(googleWebAppUrl + "?ticketId=" + encodeURIComponent(ticketCode) + "&action=check")
+        fetch(googleWebAppUrl + "?ticketId=" + encodeURIComponent(decodedText) + "&action=check")
           .then(res => res.json())
           .then(handleDataResponse)
           .catch(err => { showManualAlert("Network reading loop error: " + err.message, false); });
@@ -208,7 +223,7 @@
       } else if (response.status === 'invalid') {
         hideBanner(); renderInvalidTicketUI(response.message);
       } else {
-        showBanner(response.message, "bg-error"); resetScannerOrClose(4000);
+        showBanner(response.message, "bg-error"); resetScannerOrClose(4000, false);
       }
     }
 
@@ -246,7 +261,7 @@
 
       let cancelBtn = document.createElement('button');
       cancelBtn.className = "cancel-btn"; cancelBtn.innerText = "Cancel Check-in";
-      cancelBtn.onclick = function() { isCameraPaused = false; document.getElementById('ticket-info-box').style.display = "none"; document.getElementById('close-scanner-btn').style.display = "block"; };
+      cancelBtn.onclick = function() { resetScannerOrClose(0, false); };
       btnContainer.appendChild(cancelBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
@@ -272,7 +287,7 @@
       
       let backBtn = document.createElement('button');
       backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
-      backBtn.onclick = function() { isCameraPaused = false; document.getElementById('ticket-info-box').style.display = "none"; document.getElementById('close-scanner-btn').style.display = "block"; };
+      backBtn.onclick = function() { resetScannerOrClose(0, false); };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
@@ -288,7 +303,7 @@
       
       let backBtn = document.createElement('button');
       backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
-      backBtn.onclick = function() { isCameraPaused = false; document.getElementById('ticket-info-box').style.display = "none"; document.getElementById('close-scanner-btn').style.display = "block"; };
+      backBtn.onclick = function() { resetScannerOrClose(0, false); };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
@@ -309,18 +324,29 @@
         showBanner("Writing admission directly to spreadsheet database...", "bg-info");
         
         let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
+        
+        timeoutTracker = setTimeout(() => {
+          showBanner("Network write delay safely timed out. Re-initializing loop...", "bg-error");
+          setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
+        }, 25000);
+
         let postPayload = {
-          action: "admit", ticketId: activeTicket.ticketId, rowIndex: activeTicket.rowIndex,
-          count: count, usherName: currentUsher, ticketSummary: activeTicket.ticketSummary
+          action: "processAdmission",
+          ticketId: activeTicket.ticketId, 
+          rowIndex: activeTicket.rowIndex,
+          count: count, 
+          usherName: currentUsher, 
+          ticketSummary: activeTicket.ticketSummary
         };
 
         fetch(googleWebAppUrl, {
-          method: "POST", mode: "no-cors",
+          method: "POST", 
+          mode: "no-cors",
           headers: { "Content-Type": "text/plain" },
           body: JSON.stringify(postPayload)
         })
         .then(() => { showManualAlert("Admission successfully saved to Google Sheets!", true); })
-        .catch(err => { showManualAlert("Database entry update failed: " + err.message, false); });
+        .catch(err => { showManualAlert("Database write failure: " + err.message, false); });
       };
 
       document.getElementById('back-btn').onclick = function() { renderSelectionUI(activeTicket); };
@@ -332,16 +358,18 @@
     function showManualAlert(msg, isSuccess) {
       clearTimeout(timeoutTracker);
       showBanner(msg, isSuccess ? "bg-success" : "bg-error");
-      resetScannerOrClose(3000);
+      resetScannerOrClose(3000, false);
     }
     
-    function resetScannerOrClose(delay) {
+    function resetScannerOrClose(delay, shouldCloseTab) {
+      clearTimeout(timeoutTracker);
       setTimeout(() => {
         hideBanner();
         document.getElementById('ticket-info-box').style.display = "none";
         document.getElementById('close-scanner-btn').style.display = "block";
         isCameraPaused = false;
         activeTicket = null;
+        initScanner();
       }, delay);
     }
   </script>
