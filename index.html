@@ -1,93 +1,377 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web QR Scanner</title>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f9;
-        }
-        h1 {
-            color: #333;
-        }
-        #reader {
-            width: 100%;
-            max-width: 500px;
-            border: 2px solid #333;
-            border-radius: 8px;
-            overflow: hidden;
-            background: #fff;
-        }
-        #result-container {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 5px;
-            background-color: #e0f7fa;
-            border: 1px solid #00acc1;
-            max-width: 500px;
-            width: 100%;
-            box-sizing: border-box;
-            word-wrap: break-word;
-            display: none;
-        }
-        #result-text {
-            font-weight: bold;
-            color: #006064;
-        }
-    </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { padding: 20px; text-align: center; background-color: #1e1e24; color: #fff; font-family: system-ui, sans-serif; }
+    .container { max-width: 500px; margin: 0 auto; }
+    .card { background: #2a2a35; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); margin-top: 30px; }
+    input { background-color: #373746 !important; color: white !important; border: 1px solid #555 !important; }
+    button { background-color: #007bff; border: none; font-weight: bold; }
+    button:hover { background-color: #0056b3; }
+    
+    /* View State Control */
+    #home-view { display: block; }
+    #scanner-view { display: none; }
+    
+    /* Scanner Layout */
+    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
+    #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; }
+    
+    /* UI Boxes & Buttons */
+    #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
+    .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
+    .submit-btn:hover { background-color: #006699; }
+    .cancel-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 15px; width: 100%; background-color: #424250; border: 1px solid #666; color: #ff5555; border-radius: 6px; text-align: center; display: block; }
+    .cancel-btn:hover { background-color: #333340; }
+    .confirm-btn { font-size: 1.2rem; font-weight: bold; padding: 14px; margin-top: 10px; width: 100%; background-color: #2e7d32; border: none; color: white; border-radius: 6px; display: block; }
+    .confirm-btn:hover { background-color: #1b5e20; }
+    .back-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #616161; border: none; color: white; border-radius: 6px; display: block; }
+    .back-btn:hover { background-color: #424242; }
+    
+    /* Status Banner System */
+    #status-banner { padding: 15px; font-weight: bold; border-radius: 6px; font-size: 1.2rem; margin: 15px 0; display: none; white-space: pre-line; }
+    .bg-success { background-color: #2e7d32 !important; color: white; }
+    .bg-error { background-color: #c62828 !important; color: white; }
+    .bg-info { background-color: #1565c0 !important; color: white; }
+    
+    /* Data Lists */
+    ul { list-style-type: none; padding-left: 0; margin-bottom: 15px; }
+    li { margin-bottom: 6px; border-bottom: 1px solid #3a3a4a; padding-bottom: 6px; font-size: 1.05rem; }
+    .history-log-title { font-weight: bold; margin-top: 20px; margin-bottom: 5px; color: #aaa; font-size: 0.95rem; }
+    .history-log-container { font-size: 0.9rem; line-height: 1.4; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcc77; white-space: pre-line; }
+    
+    /* Branding Assets */
+    .top-logo { max-width: 220px; width: 100%; height: auto; margin: 0 auto 20px auto; display: block; background: #ffffff; padding: 10px; border-radius: 8px; }
+    .child-top-logo { max-width: 180px; width: 100%; height: auto; margin: 0 auto 15px auto; display: block; background: #ffffff; padding: 8px; border-radius: 6px; }
+    .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
+  </style>
 </head>
 <body>
 
-    <h1>Web QR Code Scanner</h1>
-    
-    <div id="reader"></div>
+  <main class="container">
+    <div id="home-view" class="card">
+      <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="top-logo" alt="Rangitoto College Logo">
+      <h3 id="portal-title">Ticket Scanner</h3>
 
-    <div id="result-container" id="result-box">
-        <h3>Scanned Result:</h3>
-        <p id="result-text">Waiting for scan...</p>
+      <label for="usher-name" style="text-align: left; display: block; font-weight: bold;">Scanner Name</label>
+      <input type="text" id="usher-name" placeholder="e.g., Sarah - Gate A">
+      
+      <button onclick="switchViewToScanner()" style="width: 100%; margin-top: 10px; font-size: 1.1rem; padding: 12px;">
+        Open Ticket Camera
+      </button>
+
+      <div class="credits">
+        This scanner was made by LEK to be used for official Rangitoto College ticketed events.<br>
+        If you notice any errors or have any ideas for improvements, please let him know.
+      </div>
     </div>
 
-    <script>
-        function onScanSuccess(decodedText, decodedResult) {
-            // This function triggers when a QR code is successfully scanned
-            console.log(`Code matched = ${decodedText}`, decodedResult);
-            
-            // Display the result container and update the text
-            document.getElementById('result-container').style.display = 'block';
-            document.getElementById('result-text').innerText = decodedText;
-            
-            // Optional: Vibrate the device slightly if supported (cool UX touch)
-            if (navigator.vibrate) {
-                navigator.vibrate(200);
-            }
-        }
+    <div id="scanner-view">
+      <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="child-top-logo" alt="Rangitoto College Logo">
+      <h4 id="child-header-title">Ticket Scanner</h4>
+      <p style="font-size: 0.85rem; color: #aaa; margin-top: -10px;">Scanner: <strong id="active-scanner-label" style="color:#00ff66;">Unknown</strong></p>
+      
+      <div id="reader-wrapper">
+        <div id="reader"></div>
+      </div>
+      
+      <div id="status-banner"></div>
+      
+      <div id="ticket-info-box">
+        <h4 id="box-header" style="text-align: center; color: #00d2ff; margin-bottom: 15px;">Ticket Details Found</h4>
+        <div id="dynamic-metadata"></div>
+        <hr style="margin: 15px 0;">
+        <div id="button-container"></div>
+      </div>
 
-        function onScanFailure(error) {
-            // This triggers constantly while looking for a QR code. 
-            // We leave it empty to avoid spamming the console.
-        }
+      <button id="close-scanner-btn" class="cancel-btn" onclick="switchViewToHome()">Exit Camera</button>
+    </div>
+  </main>
 
-        // Initialize the HTML5 QR Code Scanner
-        let html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 10,       // Scans 10 frames per second
-                qrbox: { width: 250, height: 250 } // Sets the scanning UI box size
-            }, 
-            /* verbose= */ false
-        );
+  <script>
+    let html5QrcodeScanner = null;
+    let isCameraPaused = false;
+    let activeTicket = null;
+    let timeoutTracker = null;
+    let googleWebAppUrl = "";
+    let globalEventName = "Ticket Scanner";
+
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const backendId = urlParams.get('backend');
+      
+      if (!backendId) {
+        showBanner("CRITICAL CONFIGURATION FAULT:\nMissing Sheet Backend ID inside your web link.\nFormat requires: URL?backend=YOUR_ID", "bg-error");
+        document.getElementById('home-view').style.display = "none";
+        return;
+      }
+      
+      googleWebAppUrl = "https://script.google.com/macros/s/" + backendId + "/exec";
+
+      let savedUsher = localStorage.getItem('concert_usher_name');
+      if (savedUsher) { document.getElementById('usher-name').value = savedUsher; }
+
+      // Try fetching active event title dynamically from Google Sheets Web App
+      fetch(googleWebAppUrl + "?action=getEventName")
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.eventName) {
+            globalEventName = data.eventName.trim();
+            document.getElementById('portal-title').innerText = globalEventName;
+            document.getElementById('child-header-title').innerText = globalEventName;
+          }
+        }).catch(() => {});
+    };
+
+    function switchViewToScanner() {
+      let usherName = document.getElementById('usher-name').value.trim();
+      if (!usherName) { alert("Please enter a scanner name before starting!"); return; }
+      localStorage.setItem('concert_usher_name', usherName);
+      
+      document.getElementById('active-scanner-label').innerText = usherName;
+      document.getElementById('home-view').style.display = "none";
+      document.getElementById('scanner-view').style.display = "block";
+      
+      setTimeout(initScanner, 150);
+    }
+
+    function switchViewToHome() {
+      stopAndDestroyCamera();
+      document.getElementById('scanner-view').style.display = "none";
+      document.getElementById('home-view').style.display = "block";
+    }
+
+    function initScanner() {
+      isCameraPaused = false;
+      activeTicket = null;
+      document.getElementById('ticket-info-box').style.display = "none";
+      document.getElementById('close-scanner-btn').style.display = "block";
+      hideBanner();
+
+      let wrapper = document.getElementById('reader-wrapper');
+      if (!document.getElementById('reader')) {
+        let readerDiv = document.createElement('div');
+        readerDiv.id = 'reader';
+        wrapper.appendChild(readerDiv);
+      }
+
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+        fps: 15, 
+        qrbox: 250,
+        aspectRatio: 1.0,
+        rememberLastUsedCamera: true,
+        useBarCodeDetectorIfSupported: false,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: false }
+      }, false);
+      
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    }
+
+    function onScanFailure(error) {}
+
+    function stopAndDestroyCamera() {
+      isCameraPaused = true;
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().then(() => {
+          let reader = document.getElementById('reader');
+          if (reader) reader.remove();
+        }).catch(() => {
+          let reader = document.getElementById('reader');
+          if (reader) reader.remove();
+        });
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      if (isCameraPaused) return;
+      stopAndDestroyCamera();
+      
+      document.getElementById('ticket-info-box').style.display = "none";
+      document.getElementById('close-scanner-btn').style.display = "none";
+      showBanner("Verifying with Google Sheets database...", "bg-info");
+      
+      timeoutTracker = setTimeout(() => {
+        showBanner("Network lag detected. Resetting interface stream interface...", "bg-error");
+        setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
+      }, 25000);
+      
+      // Execute lookup against Google Apps Script backend routing setup
+      fetch(googleWebAppUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: "checkTicketStatus", barcode: decodedText })
+      })
+      .then(() => {
+        fetch(googleWebAppUrl + "?ticketId=" + encodeURIComponent(decodedText) + "&action=check")
+          .then(res => res.json())
+          .then(handleDataResponse)
+          .catch(err => { showManualAlert("Network reading loop error: " + err.message, false); });
+      })
+      .catch(err => { showManualAlert("Database lookup dropped: " + err.message, false); });
+    }
+
+    function handleDataResponse(response) {
+      clearTimeout(timeoutTracker);
+      if (response.status === 'valid') {
+        hideBanner(); activeTicket = response; renderSelectionUI(response);
+      } else if (response.status === 'empty') {
+        hideBanner(); renderEmptyHistoryUI(response);
+      } else if (response.status === 'invalid') {
+        hideBanner(); renderInvalidTicketUI(response.message);
+      } else {
+        showBanner(response.message, "bg-error"); resetScannerOrClose(4000, false);
+      }
+    }
+
+    function formatMetadataValue(val) {
+      if (val === undefined || val === null) return '';
+      return val.toString().replace(/\\n/g, '<br>').replace(/\\r/g, '');
+    }
+
+    function renderSelectionUI(data) {
+      document.getElementById('box-header').innerText = "Ticket Details Found";
+      document.getElementById('box-header').style.color = "#00d2ff";
+
+      let htmlPayload = "<ul>";
+      for (let k = 0; k < data.details.length; k++) {
+        let item = data.details[k];
+        htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
+      }
+      htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#00ff66; font-weight:bold;">' + data.remaining + '</span> (out of ' + data.totalSeats + ' total)</li></ul>';
+      
+      if (data.historyLog && data.historyLog.trim() !== '') {
+        htmlPayload += '<p class="history-log-title">⚠️ Prior Activity Checked-In On This Ticket:</p>';
+        htmlPayload += '<div class="history-log-container">' + data.historyLog.replace(/\\n/g, '<br>') + '</div>';
+      }
+
+      document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
+      let btnContainer = document.getElementById('button-container');
+      btnContainer.innerHTML = '<p style="text-align: center; font-size:1.15rem; font-weight: bold; color: #ff9800; margin-bottom:10px;">Select how many are entering:</p>';
+      
+      for (let num = 1; num <= data.remaining; num++) {
+        let btn = document.createElement('button');
+        btn.className = "submit-btn"; btn.innerText = "Admit " + num;
+        btn.onclick = function() { renderConfirmationUI(num); };
+        btnContainer.appendChild(btn);
+      }
+
+      let cancelBtn = document.createElement('button');
+      cancelBtn.className = "cancel-btn"; cancelBtn.innerText = "Cancel Check-in";
+      cancelBtn.onclick = function() { resetScannerOrClose(0, false); };
+      btnContainer.appendChild(cancelBtn);
+      document.getElementById('ticket-info-box').style.display = "block";
+    }
+
+    function renderEmptyHistoryUI(data) {
+      document.getElementById('box-header').innerText = "No Seats Remaining";
+      document.getElementById('box-header').style.color = "#ff5555";
+
+      let htmlPayload = "<ul>";
+      for (let k = 0; k < data.details.length; k++) {
+        let item = data.details[k];
+        htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
+      }
+      htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
+
+      let cleanLogs = data.message.replace(/\\n/g, '<br>');
+      htmlPayload += '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0 15px 0; color: #ffcccc;"><strong>This ticket is fully checked-in.</strong></div>';
+      htmlPayload += '<p style="font-weight: bold; margin-bottom: 5px; color: #aaa;">Entry Log History:</p>';
+      htmlPayload += '<div style="font-size: 0.95rem; line-height: 1.5; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcccc;">' + cleanLogs + '</div>';
+
+      document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
+      let btnContainer = document.getElementById('button-container'); btnContainer.innerHTML = '';
+      
+      let backBtn = document.createElement('button');
+      backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
+      backBtn.onclick = function() { resetScannerOrClose(0, false); };
+      btnContainer.appendChild(backBtn);
+      document.getElementById('ticket-info-box').style.display = "block";
+    }
+
+    function renderInvalidTicketUI(errorMessage) {
+      document.getElementById('box-header').innerText = "Invalid Ticket";
+      document.getElementById('box-header').style.color = "#ff5555";
+      
+      let invalidHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin-bottom: 15px; color: #ffcccc; text-align: left;"><strong>UNRECOGNIZED QR CODE</strong><br>' + errorMessage + '</div>';
+      
+      document.getElementById('dynamic-metadata').innerHTML = invalidHTML;
+      let btnContainer = document.getElementById('button-container'); btnContainer.innerHTML = '';
+      
+      let backBtn = document.createElement('button');
+      backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
+      backBtn.onclick = function() { resetScannerOrClose(0, false); };
+      btnContainer.appendChild(backBtn);
+      document.getElementById('ticket-info-box').style.display = "block";
+    }
+
+    function renderConfirmationUI(count) {
+      let btnContainer = document.getElementById('button-container');
+      
+      let confirmHTML = '<div style="text-align:center; padding:15px; background:#3a3a4a; border-radius:8px; border: 2px solid #ff9800; margin-bottom:15px;">';
+      confirmHTML += '<h4 style="color:#ff9800; margin-bottom:5px; font-weight:bold;">Confirm Entry</h4>';
+      confirmHTML += '<p style="margin:0; font-size:1.25rem;">Are you sure you want to admit <strong>' + count + '</strong>?</p></div>';
+      confirmHTML += '<button id="real-submit-btn" class="confirm-btn">Yes, Confirm & Submit</button>';
+      confirmHTML += '<button id="back-btn" class="back-btn">No, Go Back</button>';
+
+      btnContainer.innerHTML = confirmHTML;
+
+      document.getElementById('real-submit-btn').onclick = function() {
+        document.getElementById('ticket-info-box').style.display = "none";
+        showBanner("Writing admission directly to spreadsheet database...", "bg-info");
         
-        // Start the scanner
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-    </script>
+        let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
+        
+        timeoutTracker = setTimeout(() => {
+          showBanner("Network write delay safely timed out. Re-initializing loop...", "bg-error");
+          setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
+        }, 25000);
+
+        let postPayload = {
+          action: "processAdmission",
+          ticketId: activeTicket.ticketId, 
+          rowIndex: activeTicket.rowIndex,
+          count: count, 
+          usherName: currentUsher, 
+          ticketSummary: activeTicket.ticketSummary
+        };
+
+        fetch(googleWebAppUrl, {
+          method: "POST", 
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify(postPayload)
+        })
+        .then(() => { showManualAlert("Admission successfully saved to Google Sheets!", true); })
+        .catch(err => { showManualAlert("Database write failure: " + err.message, false); });
+      };
+
+      document.getElementById('back-btn').onclick = function() { renderSelectionUI(activeTicket); };
+    }
+
+    function showBanner(text, cssClass) { let b = document.getElementById('status-banner'); b.className = cssClass; b.innerText = text; b.style.display = "block"; }
+    function hideBanner() { document.getElementById('status-banner').style.display = "none"; }
+    
+    function showManualAlert(msg, isSuccess) {
+      clearTimeout(timeoutTracker);
+      showBanner(msg, isSuccess ? "bg-success" : "bg-error");
+      resetScannerOrClose(3000, false);
+    }
+    
+    function resetScannerOrClose(delay, shouldCloseTab) {
+      clearTimeout(timeoutTracker);
+      setTimeout(() => {
+        hideBanner();
+        document.getElementById('ticket-info-box').style.display = "none";
+        document.getElementById('close-scanner-btn').style.display = "block";
+        isCameraPaused = false;
+        activeTicket = null;
+        initScanner();
+      }, delay);
+    }
+  </script>
 </body>
 </html>
