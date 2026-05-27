@@ -15,9 +15,8 @@
     #home-view { display: block; }
     #scanner-view { display: none; }
     
+    /* Clean container layout allowing the library to natively size its video canvas */
     #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
-    /* Force internal video frame to scale nicely without distortion */
-    #reader video { width: 100% !important; height: auto !important; }
     
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
@@ -152,11 +151,16 @@
         wrapper.appendChild(readerDiv);
       }
 
-      // Explicit configurations to square constraints to resolve desktop webcam stretching
+      // Dynamic viewport target calculations matching desktop cameras safely
+      const qrboxDynamicConstraint = (viewfinderWidth, viewfinderHeight) => {
+        let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+        let qrboxSize = Math.floor(minEdgeSize * 0.7);
+        return { width: qrboxSize, height: qrboxSize };
+      };
+
       html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 15, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0, 
+        fps: 20, 
+        qrbox: qrboxDynamicConstraint,
         rememberLastUsedCamera: true
       }, false);
       
