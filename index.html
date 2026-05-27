@@ -15,8 +15,9 @@
     #home-view { display: block; }
     #scanner-view { display: none; }
     
+    /* Responsive structural container forcing zero distortions */
     #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
-    #reader video { width: 100% !important; height: auto !important; }
+    #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; }
     
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
@@ -151,7 +152,7 @@
         wrapper.appendChild(readerDiv);
       }
 
-      // Reverted to basic engine properties to allow raw native resolution
+      // Safe bounds calculations avoiding aspect ratio clamping bugs
       html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
         fps: 15, 
         qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -159,13 +160,29 @@
           let boxSize = Math.floor(minEdge * 0.65);
           return { width: boxSize, height: boxSize };
         },
-        rememberLastUsedCamera: true
+        rememberLastUsedCamera: true,
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
       }, false);
       
-      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-    }
+      html5QrcodeScanner.render((decodedText) => {
+        onScanSuccess(decodedText);
+      }, (error) => {
+        // Failures bypass silently to retain performance cycles
+      });
 
-    function onScanFailure(error) {}
+      // iOS WebKit Mutation Patch: Prevents native media player hijack on iPhones
+      const observer = new MutationObserver(() => {
+        const iosVideo = document.querySelector('#reader video');
+        if (iosVideo) {
+          iosVideo.setAttribute('playsinline', 'true');
+          iosVideo.setAttribute('webkit-playsinline', 'true');
+          iosVideo.setAttribute('muted', 'true');
+          iosVideo.play().catch(() => {});
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.getElementById('reader'), { childList: true, subtree: true });
+    }
 
     function stopAndDestroyCamera() {
       isCameraPaused = true;
