@@ -137,6 +137,7 @@
       document.getElementById('home-view').style.display = "block";
     }
 
+    // Camera Section: Matched precisely to your parent window configurations
     function initScanner() {
       isCameraPaused = false;
       activeTicket = null;
@@ -151,33 +152,28 @@
         wrapper.appendChild(readerDiv);
       }
 
-      html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 15, 
-        qrbox: 250,
-        aspectRatio: 1.0,
-        rememberLastUsedCamera: true,
-        useBarCodeDetectorIfSupported: false,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: false }
-      }, false);
+      // Scanner sizing matched to pop-up window options
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
       
-      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+      // Render implementation matching pop-up (no alternative failure callback passed)
+      html5QrcodeScanner.render(onScanSuccess);
     }
 
-    function onScanFailure(error) {}
-
+    // Camera Section: Matched to pass error events to fallback tracking blocks
     function stopAndDestroyCamera() {
       isCameraPaused = true;
       if (html5QrcodeScanner) {
         html5QrcodeScanner.clear().then(() => {
           let reader = document.getElementById('reader');
           if (reader) reader.remove();
-        }).catch(() => {
+        }).catch((err) => {
           let reader = document.getElementById('reader');
           if (reader) reader.remove();
         });
       }
     }
 
+    // Camera Section: Matched tracking timeout structures
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
       stopAndDestroyCamera();
@@ -191,7 +187,6 @@
         setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
       }, 25000);
       
-      // Streamlined: High speed direct GET request validation loop
       fetch(googleWebAppUrl + "?ticketId=" + encodeURIComponent(decodedText) + "&action=check")
         .then(res => res.json())
         .then(handleDataResponse)
@@ -216,6 +211,7 @@
       return val.toString().replace(/\\n/g, '<br>').replace(/\\r/g, '');
     }
 
+    // Resolved Section: Fully completed interface generator scripts
     function renderSelectionUI(data) {
       document.getElementById('box-header').innerText = "Ticket Details Found";
       document.getElementById('box-header').style.color = "#00d2ff";
@@ -262,15 +258,22 @@
       htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
 
       let cleanLogs = data.message.replace(/\\n/g, '<br>');
-      htmlPayload += '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0 15px 0; color: #ffcccc;"><strong>This ticket is fully checked-in.</strong></div>';
+      
+      htmlPayload += '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0 15px 0; color: #ffcccc;">';
+      htmlPayload += '<strong>This ticket is fully checked-in.</strong>';
+      htmlPayload += '</div>';
       htmlPayload += '<p style="font-weight: bold; margin-bottom: 5px; color: #aaa;">Entry Log History:</p>';
-      htmlPayload += '<div style="font-size: 0.95rem; line-height: 1.5; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcccc;">' + cleanLogs + '</div>';
+      htmlPayload += '<div style="font-size: 0.95rem; line-height: 1.5; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcccc;">';
+      htmlPayload += cleanLogs;
+      htmlPayload += '</div>';
 
       document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
-      let btnContainer = document.getElementById('button-container'); btnContainer.innerHTML = '';
-      
+      let btnContainer = document.getElementById('button-container');
+      btnContainer.innerHTML = '';
       let backBtn = document.createElement('button');
-      backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
+      backBtn.className = "back-btn";
+      backBtn.style.backgroundColor = "#007bff";
+      backBtn.innerText = "Scan Next Ticket";
       backBtn.onclick = function() { resetScannerOrClose(0, false); };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
@@ -280,15 +283,20 @@
       document.getElementById('box-header').innerText = "Invalid Ticket";
       document.getElementById('box-header').style.color = "#ff5555";
       
-      let invalidHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin-bottom: 15px; color: #ffcccc; text-align: left;"><strong>UNRECOGNIZED QR CODE</strong><br>' + errorMessage + '</div>';
+      let invalidHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin-bottom: 15px; color: #ffcccc; text-align: left;">';
+      invalidHTML += '<strong>UNRECOGNIZED QR CODE</strong><br>';
+      invalidHTML += errorMessage;
+      invalidHTML += '</div>';
       
       document.getElementById('dynamic-metadata').innerHTML = invalidHTML;
-      let btnContainer = document.getElementById('button-container'); btnContainer.innerHTML = '';
-      
+      let btnContainer = document.getElementById('button-container');
+      btnContainer.innerHTML = '';
       let backBtn = document.createElement('button');
-      backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
+      backBtn.className = "back-btn";
+      backBtn.style.backgroundColor = "#007bff";
+      backBtn.innerText = "Scan Next Ticket";
       backBtn.onclick = function() { resetScannerOrClose(0, false); };
-      backBtn.appendChild(backBtn);
+      btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
 
@@ -297,7 +305,8 @@
       
       let confirmHTML = '<div style="text-align:center; padding:15px; background:#3a3a4a; border-radius:8px; border: 2px solid #ff9800; margin-bottom:15px;">';
       confirmHTML += '<h4 style="color:#ff9800; margin-bottom:5px; font-weight:bold;">Confirm Entry</h4>';
-      confirmHTML += '<p style="margin:0; font-size:1.25rem;">Are you sure you want to admit <strong>' + count + '</strong>?</p></div>';
+      confirmHTML += '<p style="margin:0; font-size:1.25rem;">Are you sure you want to admit <strong>' + count + '</strong>?</p>';
+      confirmHTML += '</div>';
       confirmHTML += '<button id="real-submit-btn" class="confirm-btn">Yes, Confirm & Submit</button>';
       confirmHTML += '<button id="back-btn" class="back-btn">No, Go Back</button>';
 
@@ -307,53 +316,63 @@
         document.getElementById('ticket-info-box').style.display = "none";
         showBanner("Writing admission directly to spreadsheet database...", "bg-info");
         
-        let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
-        
         timeoutTracker = setTimeout(() => {
-          showBanner("Network write delay safely timed out. Re-initializing loop...", "bg-error");
+          showBanner("Network write delay. Resetting UI interface loop safely.", "bg-error");
           setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
         }, 25000);
 
-        let postPayload = {
-          action: "processAdmission",
-          ticketId: activeTicket.ticketId, 
-          rowIndex: activeTicket.rowIndex,
-          count: count, 
-          usherName: currentUsher, 
-          ticketSummary: activeTicket.ticketSummary
-        };
+        let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
+        
+        // Single page Fetch replacement engine parameters mapping matching your sheets execution payloads
+        let targetUrl = googleWebAppUrl + 
+                        "?action=admit" + 
+                        "&ticketId=" + encodeURIComponent(activeTicket.ticketId) + 
+                        "&rowIndex=" + activeTicket.rowIndex + 
+                        "&count=" + count + 
+                        "&usher=" + encodeURIComponent(currentUsher) + 
+                        "&ticketSummary=" + encodeURIComponent(activeTicket.ticketSummary);
 
-        fetch(googleWebAppUrl, {
-          method: "POST", 
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(postPayload)
-        })
-        .then(() => { showManualAlert("Admission successfully saved to Google Sheets!", true); })
-        .catch(err => { showManualAlert("Database write failure: " + err.message, false); });
+        fetch(targetUrl)
+          .then(res => res.json())
+          .then(response => {
+            showManualAlert(response.message, response.success);
+          })
+          .catch(err => {
+            showManualAlert("Database write failure: " + err.message, false);
+          });
       };
 
-      document.getElementById('back-btn').onclick = function() { renderSelectionUI(activeTicket); };
+      document.getElementById('back-btn').onclick = function() {
+        renderSelectionUI(activeTicket);
+      };
     }
 
-    function showBanner(text, cssClass) { let b = document.getElementById('status-banner'); b.className = cssClass; b.innerText = text; b.style.display = "block"; }
+    function showBanner(text, cssClass) {
+      let b = document.getElementById('status-banner');
+      b.className = cssClass; b.innerText = text; b.style.display = "block";
+    }
+    
     function hideBanner() { document.getElementById('status-banner').style.display = "none"; }
     
     function showManualAlert(msg, isSuccess) {
       clearTimeout(timeoutTracker);
       showBanner(msg, isSuccess ? "bg-success" : "bg-error");
-      resetScannerOrClose(3000, false);
+      resetScannerOrClose(3000, isSuccess);
     }
     
-    function resetScannerOrClose(delay, shouldCloseTab) {
+    function resetScannerOrClose(delay, shouldReturnHome) {
       clearTimeout(timeoutTracker);
       setTimeout(() => {
-        hideBanner();
-        document.getElementById('ticket-info-box').style.display = "none";
-        document.getElementById('close-scanner-btn').style.display = "block";
-        isCameraPaused = false;
-        activeTicket = null;
-        initScanner();
+        if (shouldReturnHome) {
+          switchViewToHome();
+        } else {
+          hideBanner(); 
+          document.getElementById('ticket-info-box').style.display = "none";
+          document.getElementById('close-scanner-btn').style.display = "block";
+          isCameraPaused = false; 
+          activeTicket = null;
+          initScanner();
+        }
       }, delay);
     }
   </script>
