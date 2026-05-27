@@ -1,127 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Static QR File Reader Test</title>
-  <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      text-align: center;
-      background-color: #121212;
-      color: #ffffff;
-      padding: 40px 20px;
-      margin: 0;
-    }
-    .wrapper {
-      max-width: 500px;
-      margin: 0 auto;
-      background-color: #1e1e1e;
-      padding: 30px;
-      border-radius: 12px;
-      border: 1px solid #333;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-    input[type="file"] {
-      display: none;
-    }
-    .file-upload-btn {
-      display: inline-block;
-      padding: 14px 24px;
-      background-color: #007bff;
-      color: white;
-      font-weight: bold;
-      border-radius: 6px;
-      cursor: pointer;
-      margin: 20px 0;
-      font-size: 1.1rem;
-      transition: background 0.2s;
-    }
-    .file-upload-btn:hover {
-      background-color: #0056b3;
-    }
-    #result-box {
-      margin-top: 25px;
-      padding: 20px;
-      background-color: #262626;
-      border-radius: 6px;
-      border: 1px solid #444;
-      word-break: break-all;
-    }
-    #scanned-text {
-      font-size: 1.3rem;
-      font-weight: bold;
-      color: #00ff66;
-      margin-top: 10px;
-    }
-    .label {
-      color: #aaa;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    #error-text {
-      color: #ff5555;
-      font-size: 0.95rem;
-      margin-top: 10px;
-      display: none;
-      background: #3d2424;
-      padding: 10px;
-      border-radius: 4px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web QR Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            color: #333;
+        }
+        #reader {
+            width: 100%;
+            max-width: 500px;
+            border: 2px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+        #result-container {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #e0f7fa;
+            border: 1px solid #00acc1;
+            max-width: 500px;
+            width: 100%;
+            box-sizing: border-box;
+            word-wrap: break-word;
+            display: none;
+        }
+        #result-text {
+            font-weight: bold;
+            color: #006064;
+        }
+    </style>
 </head>
 <body>
 
-  <div class="wrapper">
-    <h2>QR Static Image Tester</h2>
-    <p style="color: #aaa; font-size: 0.95rem;">Upload a crisp photo of your QR code to test engine capability without webcam stream interference.</p>
+    <h1>Web QR Code Scanner</h1>
     
-    <label for="qr-file-input" class="file-upload-btn">
-      Choose QR Code Photo
-    </label>
-    <input type="file" id="qr-file-input" accept="image/*">
-    
-    <div id="result-box">
-      <div class="label">Engine Read Result</div>
-      <div id="scanned-text" style="color: #ffaa00;">No file selected yet</div>
-      <div id="error-text"></div>
+    <div id="reader"></div>
+
+    <div id="result-container" id="result-box">
+        <h3>Scanned Result:</h3>
+        <p id="result-text">Waiting for scan...</p>
     </div>
-  </div>
 
-  <script>
-    // Initialize the engine core directly in memory without UI rendering elements
-    const html5QrCode = new Html5Qrcode("qr-file-input");
+    <script>
+        function onScanSuccess(decodedText, decodedResult) {
+            // This function triggers when a QR code is successfully scanned
+            console.log(`Code matched = ${decodedText}`, decodedResult);
+            
+            // Display the result container and update the text
+            document.getElementById('result-container').style.display = 'block';
+            document.getElementById('result-text').innerText = decodedText;
+            
+            // Optional: Vibrate the device slightly if supported (cool UX touch)
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+        }
 
-    document.getElementById('qr-file-input').addEventListener('change', e => {
-      if (e.target.files.length === 0) return;
-      
-      const imageFile = e.target.files[0];
-      const scannedTextDiv = document.getElementById('scanned-text');
-      const errorTextDiv = document.getElementById('error-text');
-      
-      // Update UI states
-      scannedTextDiv.innerText = "Processing image array...";
-      scannedTextDiv.style.color = "#ffaa00";
-      errorTextDiv.style.display = "none";
+        function onScanFailure(error) {
+            // This triggers constantly while looking for a QR code. 
+            // We leave it empty to avoid spamming the console.
+        }
 
-      // Feed the raw uncompressed blob file directly to the local parser
-      html5QrCode.scanFile(imageFile, true)
-        .then(decodedText => {
-          // SUCCESS: Clear errors and output the text directly
-          scannedTextDiv.innerText = decodedText;
-          scannedTextDiv.style.color = "#00ff66";
-        })
-        .catch(err => {
-          // FAILURE: The engine could not mathematically identify the markers
-          scannedTextDiv.innerText = "FAILED TO READ";
-          scannedTextDiv.style.color = "#ff5555";
-          errorTextDiv.innerText = "Engine Error Details: " + err;
-          errorTextDiv.style.display = "block";
-        });
-    });
-  </script>
-
+        // Initialize the HTML5 QR Code Scanner
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", 
+            { 
+                fps: 10,       // Scans 10 frames per second
+                qrbox: { width: 250, height: 250 } // Sets the scanning UI box size
+            }, 
+            /* verbose= */ false
+        );
+        
+        // Start the scanner
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    </script>
 </body>
 </html>
