@@ -12,14 +12,13 @@
     button { background-color: #007bff; border: none; font-weight: bold; }
     button:hover { background-color: #0056b3; }
     
-    /* View State Control */
     #home-view { display: block; }
     #scanner-view { display: none; }
     
-    /* Scanner Layout - Let the native engine control sizing to avoid visual warping */
-    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; }
+    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
+    /* Force internal video frame to scale nicely without distortion */
+    #reader video { width: 100% !important; height: auto !important; }
     
-    /* UI Boxes & Buttons */
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
     .submit-btn:hover { background-color: #006699; }
@@ -30,19 +29,16 @@
     .back-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #616161; border: none; color: white; border-radius: 6px; display: block; }
     .back-btn:hover { background-color: #424242; }
     
-    /* Status Banner System */
     #status-banner { padding: 15px; font-weight: bold; border-radius: 6px; font-size: 1.2rem; margin: 15px 0; display: none; white-space: pre-line; }
     .bg-success { background-color: #2e7d32 !important; color: white; }
     .bg-error { background-color: #c62828 !important; color: white; }
     .bg-info { background-color: #1565c0 !important; color: white; }
     
-    /* Data Lists */
     ul { list-style-type: none; padding-left: 0; margin-bottom: 15px; }
     li { margin-bottom: 6px; border-bottom: 1px solid #3a3a4a; padding-bottom: 6px; font-size: 1.05rem; }
     .history-log-title { font-weight: bold; margin-top: 20px; margin-bottom: 5px; color: #aaa; font-size: 0.95rem; }
     .history-log-container { font-size: 0.9rem; line-height: 1.4; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcc77; white-space: pre-line; }
     
-    /* Branding Assets */
     .top-logo { max-width: 220px; width: 100%; height: auto; margin: 0 auto 20px auto; display: block; background: #ffffff; padding: 10px; border-radius: 8px; }
     .child-top-logo { max-width: 180px; width: 100%; height: auto; margin: 0 auto 15px auto; display: block; background: #ffffff; padding: 8px; border-radius: 6px; }
     .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
@@ -113,7 +109,6 @@
       let savedUsher = localStorage.getItem('concert_usher_name');
       if (savedUsher) { document.getElementById('usher-name').value = savedUsher; }
 
-      // Safely fetch active event title dynamically from Google Sheets Web App configuration
       fetch(googleWebAppUrl + "?action=getEventName")
         .then(res => res.json())
         .then(data => {
@@ -157,14 +152,11 @@
         wrapper.appendChild(readerDiv);
       }
 
-      // Configure native scanner engine with dynamic responsive viewfinder sizing bounds
+      // Explicit configurations to square constraints to resolve desktop webcam stretching
       html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 10, 
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-          let qrboxSize = Math.floor(minEdgeSize * 0.7);
-          return { width: qrboxSize, height: qrboxSize };
-        },
+        fps: 15, 
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0, 
         rememberLastUsedCamera: true
       }, false);
       
@@ -199,7 +191,6 @@
         setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
       }, 25000);
       
-      // Execute proxy staging lookup pattern
       fetch(googleWebAppUrl, {
         method: "POST",
         mode: "no-cors",
