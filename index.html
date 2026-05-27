@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Simple QR Reader</title>
+  <title>High-Res QR Reader</title>
   <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
   <style>
     body {
@@ -15,7 +15,7 @@
       margin: 0;
     }
     .wrapper {
-      max-width: 450px;
+      max-width: 640px; /* Widened to account for desktop camera layouts */
       margin: 0 auto;
     }
     #reader {
@@ -28,7 +28,6 @@
     #reader video {
       width: 100% !important;
       height: auto !important;
-      object-fit: cover !important;
     }
     #result-box {
       margin-top: 20px;
@@ -64,7 +63,7 @@
 <body>
 
   <div class="wrapper">
-    <h2>QR Code Scanner</h2>
+    <h2>QR Code Scanner (Desktop Optimized)</h2>
     
     <div id="reader"></div>
     
@@ -87,19 +86,27 @@
       document.getElementById('scanned-text').innerText = "Waiting for QR code...";
       document.getElementById('reset-btn').style.display = "none";
 
+      // Rebuilt using the low-level experimental config architecture to force desktop hardware settings
       html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 15, 
+        fps: 20, // Bumbed up frame parsing cadence 
         qrbox: function(viewfinderWidth, viewfinderHeight) {
           let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          return { width: Math.floor(minEdge * 0.65), height: Math.floor(minEdge * 0.65) };
+          // Expanded target window to 80% to read smaller codes further back
+          return { width: Math.floor(minEdge * 0.80), height: Math.floor(minEdge * 0.80) };
         },
         rememberLastUsedCamera: true,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        // Force high-definition constraint pipeline over web media parameters
+        videoConstraints: {
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+          facingMode: "environment"
+        }
       }, false);
       
       html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 
-      // iOS Safari Fix to force inline rendering without full-screen hijacking
+      // Mutation Observer remains active to support iOS deployments cleanly
       const observer = new MutationObserver(() => {
         const iosVideo = document.querySelector('#reader video');
         if (iosVideo) {
@@ -114,20 +121,16 @@
     }
 
     function onScanSuccess(decodedText) {
-      // 1. Instantly print the raw scanned content onto the web page
       document.getElementById('scanned-text').innerText = decodedText;
-      
-      // 2. Show the reset button
       document.getElementById('reset-btn').style.display = "inline-block";
       
-      // 3. Stop the camera feed so it freezes on the captured scan
       if (html5QrcodeScanner) {
         html5QrcodeScanner.clear().catch(() => {});
       }
     }
 
     function onScanFailure(error) {
-      // Direct pass-through for performance frames
+      // Clean performance frame loop bypass
     }
 
     function resetScanner() {
