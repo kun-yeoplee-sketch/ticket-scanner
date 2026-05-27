@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
   <style>
     body { padding: 20px; text-align: center; background-color: #1e1e24; color: #fff; font-family: system-ui, sans-serif; }
     .container { max-width: 500px; margin: 0 auto; }
@@ -16,9 +16,8 @@
     #home-view { display: block; }
     #scanner-view { display: none; }
     
-    /* Scanner Layout */
-    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
-    #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; }
+    /* Scanner Layout - Let the native engine control sizing to avoid visual warping */
+    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; }
     
     /* UI Boxes & Buttons */
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
@@ -114,7 +113,7 @@
       let savedUsher = localStorage.getItem('concert_usher_name');
       if (savedUsher) { document.getElementById('usher-name').value = savedUsher; }
 
-      // Try fetching active event title dynamically from Google Sheets Web App
+      // Safely fetch active event title dynamically from Google Sheets Web App configuration
       fetch(googleWebAppUrl + "?action=getEventName")
         .then(res => res.json())
         .then(data => {
@@ -158,13 +157,15 @@
         wrapper.appendChild(readerDiv);
       }
 
+      // Configure native scanner engine with dynamic responsive viewfinder sizing bounds
       html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 15, 
-        qrbox: 250,
-        aspectRatio: 1.0,
-        rememberLastUsedCamera: true,
-        useBarCodeDetectorIfSupported: false,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: false }
+        fps: 10, 
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+          let qrboxSize = Math.floor(minEdgeSize * 0.7);
+          return { width: qrboxSize, height: qrboxSize };
+        },
+        rememberLastUsedCamera: true
       }, false);
       
       html5QrcodeScanner.render(onScanSuccess, onScanFailure);
@@ -198,7 +199,7 @@
         setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
       }, 25000);
       
-      // Execute lookup against Google Apps Script backend routing setup
+      // Execute proxy staging lookup pattern
       fetch(googleWebAppUrl, {
         method: "POST",
         mode: "no-cors",
