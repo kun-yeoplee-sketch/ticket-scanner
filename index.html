@@ -12,12 +12,14 @@
     button { background-color: #007bff; border: none; font-weight: bold; }
     button:hover { background-color: #0056b3; }
     
-    #scanner-view { display: none; }
-    #reader { 
-      width: 100%; max-width: 450px; aspect-ratio: 1 / 1; margin: 0 auto 15px auto; 
-      border: 3px solid #333 !important; border-radius: 8px; background: #000; overflow: hidden;
-    }
+    /* Elegant credit styling matching LEK's original look */
+    .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
     
+    /* View Toggling */
+    #scanner-view { display: none; }
+    
+    /* Layout styling from your camera pop-out window */
+    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; }
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
     .submit-btn:hover { background-color: #006699; }
@@ -27,71 +29,102 @@
     .confirm-btn:hover { background-color: #1b5e20; }
     .back-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #616161; border: none; color: white; border-radius: 6px; display: block; }
     .back-btn:hover { background-color: #424242; }
+    
     #status-banner { padding: 15px; font-weight: bold; border-radius: 6px; font-size: 1.2rem; margin: 15px 0; display: none; white-space: pre-line; }
     .bg-success { background-color: #2e7d32 !important; color: white; }
     .bg-error { background-color: #c62828 !important; color: white; }
     .bg-info { background-color: #1565c0 !important; color: white; }
+    
     ul { list-style-type: none; padding-left: 0; margin-bottom: 15px; }
     li { margin-bottom: 6px; border-bottom: 1px solid #3a3a4a; padding-bottom: 6px; font-size: 1.05rem; }
     .history-log-title { font-weight: bold; margin-top: 20px; margin-bottom: 5px; color: #aaa; font-size: 0.95rem; }
     .history-log-container { font-size: 0.9rem; line-height: 1.4; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcc77; white-space: pre-line; }
+    
     .top-logo { max-width: 220px; width: 100%; height: auto; margin: 0 auto 20px auto; display: block; background: #ffffff; padding: 10px; border-radius: 8px; }
     .child-top-logo { max-width: 180px; width: 100%; height: auto; margin: 0 auto 15px auto; display: block; background: #ffffff; padding: 8px; border-radius: 6px; }
   </style>
 </head>
 <body>
+
   <main class="container">
     <div id="home-view" class="card">
-      <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="top-logo" alt="Rangitoto Logo">
-      <h3 id="portal-title">Rangitoto Ticket Scanner</h3>
+      <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="top-logo" alt="Rangitoto College Logo">
+      <h3 id="portal-title">Ticket Scanner</h3>
+
       <label for="usher-name" style="text-align: left; display: block; font-weight: bold;">Scanner Name</label>
       <input type="text" id="usher-name" placeholder="e.g., Sarah - Gate A">
-      <button onclick="switchViewToScanner()" style="width: 100%; margin-top: 10px; font-size: 1.1rem; padding: 12px;">Open Ticket Camera</button>
+      
+      <button onclick="switchViewToScanner()" style="width: 100%; margin-top: 10px; font-size: 1.1rem; padding: 12px;">
+        Open Ticket Camera
+      </button>
+
+      <div class="credits">
+        This scanner was made by LEK to be used for official Rangitoto College ticketed events.<br>
+        If you notice any errors or have any ideas for improvements, please let him know.
+      </div>
     </div>
 
     <div id="scanner-view">
-      <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="child-top-logo" alt="Rangitoto Logo">
+      <img src="https://www.rangitoto.school.nz/app/uploads/2021/05/logo-dark.png" class="child-top-logo" alt="Rangitoto College Logo">
       <h4 id="child-header-title">Live Scanner</h4>
       <p style="font-size: 0.85rem; color: #aaa; margin-top: -10px;">Scanner: <strong id="active-scanner-label" style="color:#00ff66;">Unknown</strong></p>
-      <div id="reader"></div>
+      
+      <div id="reader-wrapper">
+        <div id="reader"></div>
+      </div>
+      
       <div id="status-banner"></div>
+      
       <div id="ticket-info-box">
-        <h4 id="box-header" style="text-align: center; color: #00d2ff; margin-bottom: 15px;">Ticket Details</h4>
+        <h4 id="box-header" style="text-align: center; color: #00d2ff; margin-bottom: 15px;">Ticket Details Found</h4>
         <div id="dynamic-metadata"></div>
         <hr style="margin: 15px 0;">
         <div id="button-container"></div>
       </div>
+      
       <button id="close-scanner-btn" class="cancel-btn" onclick="switchViewToHome()">Exit Camera</button>
     </div>
   </main>
 
   <script>
-    let html5QrCode = null;
+    let html5QrcodeScanner = null;
     let isCameraPaused = false;
     let activeTicket = null;
     let googleWebAppUrl = "";
+    let timeoutTracker = null;
 
     window.onload = function() {
-      // DYNAMIC DECODE: Grabs your unique Google Sheet deployment ID straight from your website link parameters!
+      // Extract the target Google Sheets deployment parameter from the web link URL string
       const urlParams = new URLSearchParams(window.location.search);
       const backendId = urlParams.get('backend');
       
       if (!backendId) {
-        showBanner("CRITICAL ERROR:\nMissing configuration ID in your web link.\nFormat should be: your-app.vercel.app?backend=ID", "bg-error");
+        showBanner("CRITICAL CONFIGURATION FAULT:\nMissing Sheet Backend ID inside your web link.\nFormat requires: URL?backend=YOUR_ID", "bg-error");
         document.getElementById('home-view').style.display = "none";
         return;
       }
-      // Reconstructs the exact destination path dynamically
+      
       googleWebAppUrl = "https://script.google.com/macros/s/" + backendId + "/exec";
 
       let savedUsher = localStorage.getItem('concert_usher_name');
       if (savedUsher) { document.getElementById('usher-name').value = savedUsher; }
+      
+      // Auto-fetch event properties from your deployment script metadata asynchronously
+      fetch(googleWebAppUrl + "?action=getEventName")
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.eventName) {
+            document.getElementById('portal-title').innerText = data.eventName;
+            document.getElementById('child-header-title').innerText = data.eventName;
+          }
+        }).catch(() => { /* Fallback securely silently if no explicit header label function exists yet */ });
     };
 
     function switchViewToScanner() {
       let usherName = document.getElementById('usher-name').value.trim();
       if (!usherName) { alert("Please enter a scanner name before starting!"); return; }
       localStorage.setItem('concert_usher_name', usherName);
+      
       document.getElementById('active-scanner-label').innerText = usherName;
       document.getElementById('home-view').style.display = "none";
       document.getElementById('scanner-view').style.display = "block";
@@ -99,11 +132,7 @@
     }
 
     function switchViewToHome() {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().then(() => { proceedToHomeLayout(); }).catch(() => { proceedToHomeLayout(); });
-      } else { proceedToHomeLayout(); }
-    }
-    function proceedToHomeLayout() {
+      stopAndDestroyCamera();
       document.getElementById('scanner-view').style.display = "none";
       document.getElementById('home-view').style.display = "block";
     }
@@ -112,47 +141,69 @@
       isCameraPaused = false;
       activeTicket = null;
       document.getElementById('ticket-info-box').style.display = "none";
+      document.getElementById('close-scanner-btn').style.display = "block";
       hideBanner();
 
-      html5QrCode = new Html5Qrcode("reader");
-      const config = {
-        fps: 8, qrbox: 250, aspectRatio: 1.0,
-        videoConstraints: { width: { ideal: 1280 }, height: { ideal: 720 } }
-      };
+      let wrapper = document.getElementById('reader-wrapper');
+      if (!document.getElementById('reader')) {
+        let readerDiv = document.createElement('div');
+        readerDiv.id = 'reader';
+        wrapper.appendChild(readerDiv);
+      }
+      
+      // RESTORED: Your exact signature camera control scanner selection layout properties
+      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
+      html5QrcodeScanner.render(onScanSuccess);
+    }
 
-      html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-        .catch(err => { showBanner("Camera Error: " + err, "bg-error"); });
+    function stopAndDestroyCamera() {
+      isCameraPaused = true;
+      if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().then(() => {
+          let reader = document.getElementById('reader');
+          if (reader) reader.remove();
+        }).catch(() => {
+          let reader = document.getElementById('reader');
+          if (reader) reader.remove();
+        });
+      }
     }
 
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
-      isCameraPaused = true;
-      html5QrCode.stop().then(() => { executeDatabaseLookup(decodedText); }).catch(() => { executeDatabaseLookup(decodedText); });
+      stopAndDestroyCamera();
+      
+      document.getElementById('ticket-info-box').style.display = "none";
+      document.getElementById('close-scanner-btn').style.display = "none";
+      showBanner("Verifying with Google Sheets database...", "bg-info");
+      
+      timeoutTracker = setTimeout(() => {
+        showBanner("Network connection lag detected. Resetting camera stream interface...", "bg-error");
+        setTimeout(() => { initScanner(); }, 3000);
+      }, 25000);
+      
+      executeDatabaseLookup(decodedText);
     }
 
     function executeDatabaseLookup(ticketCode) {
-      document.getElementById('ticket-info-box').style.display = "none";
-      showBanner("Verifying with Google Sheets...", "bg-info");
-
-      // Secure external bridge execution replacing google.script.run
+      // Secure non-blocking cross-origin network fetch pipeline matching the Vercel architecture rules
       fetch(googleWebAppUrl, {
         method: "POST",
-        mode: "no-cors", // Bypasses CORS browser preflight freezes safely
+        mode: "no-cors",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ action: "check", ticketId: ticketCode })
       })
       .then(() => {
-        // Since no-cors hides response readings, we use a minor helper trick:
-        // Re-pinging using standard stream fetches cleanly
         fetch(googleWebAppUrl + "?ticketId=" + encodeURIComponent(ticketCode) + "&action=check")
           .then(res => res.json())
           .then(handleDataResponse)
-          .catch(err => { showManualAlert("Network parsing fault: " + err.message, false); });
+          .catch(err => { showManualAlert("Network reading loop error: " + err.message, false); });
       })
-      .catch(err => { showManualAlert("Database connection error: " + err.message, false); });
+      .catch(err => { showManualAlert("Database lookup dropped: " + err.message, false); });
     }
 
     function handleDataResponse(response) {
+      clearTimeout(timeoutTracker);
       if (response.status === 'valid') {
         hideBanner(); activeTicket = response; renderSelectionUI(response);
       } else if (response.status === 'empty') {
@@ -160,7 +211,7 @@
       } else if (response.status === 'invalid') {
         hideBanner(); renderInvalidTicketUI(response.message);
       } else {
-        showBanner(response.message, "bg-error"); resetScannerOrClose(4000);
+        showBanner(response.message, "bg-error"); resetScannerOrClose(4000, false);
       }
     }
 
@@ -170,20 +221,24 @@
     }
 
     function renderSelectionUI(data) {
-      document.getElementById('close-scanner-btn').style.display = "none";
+      document.getElementById('box-header').innerText = "Ticket Details Found";
+      document.getElementById('box-header').style.color = "#00d2ff";
+
       let htmlPayload = "<ul>";
       for (let k = 0; k < data.details.length; k++) {
-        htmlPayload += '<li><strong>' + data.details[k].label + ':</strong><br>' + formatMetadataValue(data.details[k].value) + '</li>';
+        let item = data.details[k];
+        htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
       }
-      htmlPayload += '<li><strong>Remaining Seats:</strong> <span style="color:#00ff66; font-weight:bold;">' + data.remaining + '</span> / ' + data.totalSeats + '</li></ul>';
+      htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#00ff66; font-weight:bold;">' + data.remaining + '</span> (out of ' + data.totalSeats + ' total)</li></ul>';
       
       if (data.historyLog && data.historyLog.trim() !== '') {
-        htmlPayload += '<p class="history-log-title">⚠️ Prior Arrivals On This Ticket:</p><div class="history-log-container">' + data.historyLog.replace(/\\n/g, '<br>') + '</div>';
+        htmlPayload += '<p class="history-log-title">⚠️ Prior Activity Checked-In On This Ticket:</p>';
+        htmlPayload += '<div class="history-log-container">' + data.historyLog.replace(/\\n/g, '<br>') + '</div>';
       }
 
       document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
       let btnContainer = document.getElementById('button-container');
-      btnContainer.innerHTML = '<p style="text-align: center; font-size:1.1rem; font-weight: bold; color: #ff9800; margin-bottom:10px;">Select size entering:</p>';
+      btnContainer.innerHTML = '<p style="text-align: center; font-size:1.15rem; font-weight: bold; color: #ff9800; margin-bottom:10px;">Select how many are entering:</p>';
       
       for (let num = 1; num <= data.remaining; num++) {
         let btn = document.createElement('button');
@@ -193,53 +248,69 @@
       }
 
       let cancelBtn = document.createElement('button');
-      cancelBtn.className = "cancel-btn"; cancelBtn.innerText = "Cancel & Scan Next";
-      cancelBtn.onclick = function() { resetScannerOrClose(0); };
+      cancelBtn.className = "cancel-btn"; cancelBtn.innerText = "Cancel Check-in";
+      cancelBtn.onclick = function() { initScanner(); };
       btnContainer.appendChild(cancelBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
 
     function renderEmptyHistoryUI(data) {
-      document.getElementById('close-scanner-btn').style.display = "none";
+      document.getElementById('box-header').innerText = "No Seats Remaining";
+      document.getElementById('box-header').style.color = "#ff5555";
+
       let htmlPayload = "<ul>";
       for (let k = 0; k < data.details.length; k++) {
-        htmlPayload += '<li><strong>' + data.details[k].label + ':</strong><br>' + formatMetadataValue(data.details[k].value) + '</li>';
+        let item = data.details[k];
+        htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
       }
-      htmlPayload += '<li><strong>Remaining Seats:</strong> <span style="color:#ff5555; font-weight:bold;">0</span> / ' + data.totalSeats + '</li></ul>';
-      htmlPayload += '<div style="background-color: #3d2424; padding: 12px; border-radius:6px; border-left:4px solid #ff5555; margin:15px 0; color:#ffcccc;"><strong>Fully Checked-In.</strong></div>';
-      htmlPayload += '<p style="font-weight:bold; color:#aaa; font-size:0.9rem;">Log details:</p><div style="font-size:0.9rem; background:#1a1a22; padding:10px; border-radius:6px; color:#ffcccc;">' + data.message.replace(/\\n/g, '<br>') + '</div>';
+      htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
+
+      let cleanLogs = data.message.replace(/\\n/g, '<br>');
+      htmlPayload += '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0 15px 0; color: #ffcccc;"><strong>This ticket is fully checked-in.</strong></div>';
+      htmlPayload += '<p style="font-weight: bold; margin-bottom: 5px; color: #aaa;">Entry Log History:</p>';
+      htmlPayload += '<div style="font-size: 0.95rem; line-height: 1.5; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcccc;">' + cleanLogs + '</div>';
 
       document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
       let btnContainer = document.getElementById('button-container'); btnContainer.innerHTML = '';
+      
       let backBtn = document.createElement('button');
       backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
-      backBtn.onclick = function() { resetScannerOrClose(0); };
+      backBtn.onclick = function() { initScanner(); };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
 
     function renderInvalidTicketUI(errorMessage) {
-      document.getElementById('close-scanner-btn').style.display = "none";
-      document.getElementById('dynamic-metadata').innerHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius:6px; border-left:4px solid #ff5555; color:#ffcccc; text-align:left;"><strong>UNRECOGNIZED CODE</strong><br>' + errorMessage + '</div>';
+      document.getElementById('box-header').innerText = "Invalid Ticket";
+      document.getElementById('box-header').style.color = "#ff5555";
+      
+      let invalidHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin-bottom: 15px; color: #ffcccc; text-align: left;"><strong>UNRECOGNIZED QR CODE</strong><br>' + errorMessage + '</div>';
+      
+      document.getElementById('dynamic-metadata').innerHTML = invalidHTML;
       let btnContainer = document.getElementById('button-container'); btnContainer.innerHTML = '';
+      
       let backBtn = document.createElement('button');
       backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
-      backBtn.onclick = function() { resetScannerOrClose(0); };
+      backBtn.onclick = function() { initScanner(); };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
 
     function renderConfirmationUI(count) {
       let btnContainer = document.getElementById('button-container');
-      let confirmHTML = '<div style="text-align:center; padding:12px; background:#3a3a4a; border-radius:8px; border:2px solid #ff9800; margin-bottom:15px;"><p style="margin:0; font-size:1.15rem;">Admit <strong>' + count + '</strong> seat(s)?</p></div>';
-      confirmHTML += '<button id="real-submit-btn" class="confirm-btn">Yes, Confirm Entry</button>';
-      confirmHTML += '<button id="back-btn" class="back-btn">Go Back</button>';
+      
+      let confirmHTML = '<div style="text-align:center; padding:15px; background:#3a3a4a; border-radius:8px; border: 2px solid #ff9800; margin-bottom:15px;">';
+      confirmHTML += '<h4 style="color:#ff9800; margin-bottom:5px; font-weight:bold;">Confirm Entry</h4>';
+      confirmHTML += '<p style="margin:0; font-size:1.25rem;">Are you sure you want to admit <strong>' + count + '</strong>?</p></div>';
+      confirmHTML += '<button id="real-submit-btn" class="confirm-btn">Yes, Confirm & Submit</button>';
+      confirmHTML += '<button id="back-btn" class="back-btn">No, Go Back</button>';
+
       btnContainer.innerHTML = confirmHTML;
 
       document.getElementById('real-submit-btn').onclick = function() {
         document.getElementById('ticket-info-box').style.display = "none";
-        showBanner("Writing check-in to Google Sheets database...", "bg-info");
-
+        showBanner("Writing admission directly to spreadsheet database...", "bg-info");
+        
         let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
         let postPayload = {
           action: "admit", ticketId: activeTicket.ticketId, rowIndex: activeTicket.rowIndex,
@@ -251,8 +322,8 @@
           headers: { "Content-Type": "text/plain" },
           body: JSON.stringify(postPayload)
         })
-        .then(() => { showManualAlert("Admission logged successfully!", true); })
-        .catch(err => { showManualAlert("Write failure: " + err.message, false); });
+        .then(() => { showManualAlert("Admission successfully saved to Google Sheets!", true); })
+        .catch(err => { showManualAlert("Database entry update failed: " + err.message, false); });
       };
 
       document.getElementById('back-btn').onclick = function() { renderSelectionUI(activeTicket); };
@@ -260,13 +331,15 @@
 
     function showBanner(text, cssClass) { let b = document.getElementById('status-banner'); b.className = cssClass; b.innerText = text; b.style.display = "block"; }
     function hideBanner() { document.getElementById('status-banner').style.display = "none"; }
-    function showManualAlert(msg, isSuccess) { showBanner(msg, isSuccess ? "bg-success" : "bg-error"); resetScannerOrClose(3000); }
+    
+    function showManualAlert(msg, isSuccess) {
+      clearTimeout(timeoutTracker);
+      showBanner(msg, isSuccess ? "bg-success" : "bg-error");
+      resetScannerOrClose(3000);
+    }
     
     function resetScannerOrClose(delay) {
       setTimeout(() => {
-        hideBanner();
-        document.getElementById('ticket-info-box').style.display = "none";
-        document.getElementById('close-scanner-btn').style.display = "block";
         initScanner();
       }, delay);
     }
