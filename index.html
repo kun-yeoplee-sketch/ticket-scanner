@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
-  <script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/qr-scanner-wechat/dist/index.global.js"></script>
   <style>
     body { padding: 20px; text-align: center; background-color: #1e1e24; color: #fff; font-family: system-ui, sans-serif; }
     .container { max-width: 500px; margin: 0 auto; }
@@ -15,8 +15,16 @@
     #home-view { display: block; }
     #scanner-view { display: none; }
     
-    /* Clean container layout allowing the library to natively size its video canvas */
-    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; }
+    /* Viewfinder Area Setup */
+    .video-container { width: 100%; border: 3px solid #333; border-radius: 8px; background: #000; margin-bottom: 15px; overflow: hidden; position: relative; line-height: 0; }
+    #webcam-feed { width: 100%; height: auto; transform: scaleX(1); }
+    .laser-line { position: absolute; top: 15%; left: 10%; right: 10%; height: 2px; background: #00ff66; box-shadow: 0 0 8px #00ff66; animation: scanAnimation 2.5s infinite linear; pointer-events: none; }
+    
+    @keyframes scanAnimation {
+      0% { top: 15%; }
+      50% { top: 85%; }
+      100% { top: 15%; }
+    }
     
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
@@ -68,8 +76,9 @@
       <h4 id="child-header-title">Ticket Scanner</h4>
       <p style="font-size: 0.85rem; color: #aaa; margin-top: -10px;">Scanner: <strong id="active-scanner-label" style="color:#00ff66;">Unknown</strong></p>
       
-      <div id="reader-wrapper">
-        <div id="reader"></div>
+      <div class="video-container">
+        <video id="webcam-feed" autoplay playsinline muted></video>
+        <div class="laser-line"></div>
       </div>
       
       <div id="status-banner"></div>
@@ -86,7 +95,8 @@
   </main>
 
   <script>
-    let html5QrcodeScanner = null;
+    let localStream = null;
+    let scanInterval = null;
     let isCameraPaused = false;
     let activeTicket = null;
     let timeoutTracker = null;
@@ -117,6 +127,11 @@
             document.getElementById('child-header-title').innerText = globalEventName;
           }
         }).catch(() => {});
+
+      // Warm up / preload WeChat WASM dependency instantly
+      if (window.QrScannerWechat) {
+        window.QrScannerWechat.ready().catch(e => console.log("Engine initialization:", e));
+      }
     };
 
     function switchViewToScanner() {
@@ -128,7 +143,7 @@
       document.getElementById('home-view').style.display = "none";
       document.getElementById('scanner-view').style.display = "block";
       
-      setTimeout(initScanner, 150);
+      setTimeout(startWeChatCamera, 150);
     }
 
     function switchViewToHome() {
@@ -137,49 +152,69 @@
       document.getElementById('home-view').style.display = "block";
     }
 
-    function initScanner() {
+    async function startWeChatCamera() {
       isCameraPaused = false;
       activeTicket = null;
       document.getElementById('ticket-info-box').style.display = "none";
       document.getElementById('close-scanner-btn').style.display = "block";
       hideBanner();
 
-      let wrapper = document.getElementById('reader-wrapper');
-      if (!document.getElementById('reader')) {
-        let readerDiv = document.createElement('div');
-        readerDiv.id = 'reader';
-        wrapper.appendChild(readerDiv);
-      }
-
-      // Dynamic viewport target calculations matching desktop cameras safely
-      const qrboxDynamicConstraint = (viewfinderWidth, viewfinderHeight) => {
-        let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-        let qrboxSize = Math.floor(minEdgeSize * 0.7);
-        return { width: qrboxSize, height: qrboxSize };
-      };
-
-      html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-        fps: 20, 
-        qrbox: qrboxDynamicConstraint,
-        rememberLastUsedCamera: true
-      }, false);
+      const videoElement = document.getElementById('webcam-feed');
       
-      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-    }
+      try {
+        // Request optimized, clean resolution pipeline with fallback properties
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+        
+        videoElement.srcObject = localStream;
+        await videoElement.play();
+        
+        // Canvas buffer initialization
+        const hiddenCanvas = document.createElement('canvas');
+        const canvasCtx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
 
-    function onScanFailure(error) {}
+        // Frame execution interval loop running every 120ms
+        scanInterval = setInterval(async () => {
+          if (isCameraPaused || videoElement.paused || videoElement.ended) return;
+
+          if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return;
+
+          hiddenCanvas.width = videoElement.videoWidth;
+          hiddenCanvas.height = videoElement.videoHeight;
+          
+          canvasCtx.drawImage(videoElement, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+          
+          try {
+            // Processing frame direct over WeChat core WASM
+            const scanResult = await window.QrScannerWechat.scan(hiddenCanvas);
+            if (scanResult && scanResult.text && !isCameraPaused) {
+              onScanSuccess(scanResult.text);
+            }
+          } catch (scanError) {
+            // Fails silently if no valid structure is processed out of frames
+          }
+        }, 120);
+
+      } catch (err) {
+        showBanner("Camera Acquisition Denied:\n" + err.message + "\nPlease permit camera access configurations.", "bg-error");
+      }
+    }
 
     function stopAndDestroyCamera() {
       isCameraPaused = true;
-      if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().then(() => {
-          let reader = document.getElementById('reader');
-          if (reader) reader.remove();
-        }).catch(() => {
-          let reader = document.getElementById('reader');
-          if (reader) reader.remove();
-        });
+      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
       }
+      const videoElement = document.getElementById('webcam-feed');
+      if (videoElement) { videoElement.srcObject = null; }
     }
 
     function onScanSuccess(decodedText) {
@@ -365,7 +400,7 @@
         document.getElementById('close-scanner-btn').style.display = "block";
         isCameraPaused = false;
         activeTicket = null;
-        initScanner();
+        startWeChatCamera();
       }, delay);
     }
   </script>
