@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
@@ -11,15 +11,15 @@
     input { background-color: #373746 !important; color: white !important; border: 1px solid #555 !important; }
     button { background-color: #007bff; border: none; font-weight: bold; }
     button:hover { background-color: #0056b3; }
-    
-    /* Elegant credit styling matching LEK's original look */
     .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
     
-    /* View Toggling */
     #scanner-view { display: none; }
     
-    /* Layout styling from your camera pop-out window */
-    #reader { width: 100%; border: 3px solid #333 !important; border-radius: 8px; background: #000; margin-bottom: 15px; }
+    /* Hardened scanner container constraints for mobile layouts */
+    #reader { width: 100%; max-width: 450px; margin: 0 auto 15px auto; border: 3px solid #333 !important; border-radius: 8px; background: #000; overflow: hidden; }
+    /* Force internal iOS video elements to scale properly without dropping frames */
+    #reader video { width: 100% !important; height: auto !important; object-fit: cover !important; }
+    
     #ticket-info-box { background: #2a2a35; padding: 20px; border-radius: 8px; text-align: left; margin: 15px 0; display: none; border: 1px solid #444; }
     .submit-btn { font-size: 1.1rem; font-weight: bold; padding: 12px; margin-top: 10px; width: 100%; background-color: #0088cc; border: none; color: white; border-radius: 6px; text-align: center; display: block; }
     .submit-btn:hover { background-color: #006699; }
@@ -69,9 +69,7 @@
       <h4 id="child-header-title">Live Scanner</h4>
       <p style="font-size: 0.85rem; color: #aaa; margin-top: -10px;">Scanner: <strong id="active-scanner-label" style="color:#00ff66;">Unknown</strong></p>
       
-      <div id="reader-wrapper">
-        <div id="reader"></div>
-      </div>
+      <div id="reader"></div>
       
       <div id="status-banner"></div>
       
@@ -94,7 +92,6 @@
     let timeoutTracker = null;
 
     window.onload = function() {
-      // Extract the target Google Sheets deployment parameter from the web link URL string
       const urlParams = new URLSearchParams(window.location.search);
       const backendId = urlParams.get('backend');
       
@@ -109,7 +106,6 @@
       let savedUsher = localStorage.getItem('concert_usher_name');
       if (savedUsher) { document.getElementById('usher-name').value = savedUsher; }
       
-      // Auto-fetch event properties from your deployment script metadata asynchronously
       fetch(googleWebAppUrl + "?action=getEventName")
         .then(res => res.json())
         .then(data => {
@@ -117,7 +113,7 @@
             document.getElementById('portal-title').innerText = data.eventName;
             document.getElementById('child-header-title').innerText = data.eventName;
           }
-        }).catch(() => { /* Fallback securely silently if no explicit header label function exists yet */ });
+        }).catch(() => { /* Standard silent fallback */ });
     };
 
     function switchViewToScanner() {
@@ -128,7 +124,9 @@
       document.getElementById('active-scanner-label').innerText = usherName;
       document.getElementById('home-view').style.display = "none";
       document.getElementById('scanner-view').style.display = "block";
-      initScanner();
+      
+      // Give iOS layout engine 150ms to shift views before turning on camera hardware tracking
+      setTimeout(initScanner, 150);
     }
 
     function switchViewToHome() {
@@ -144,34 +142,34 @@
       document.getElementById('close-scanner-btn').style.display = "block";
       hideBanner();
 
-      let wrapper = document.getElementById('reader-wrapper');
-      if (!document.getElementById('reader')) {
-        let readerDiv = document.createElement('div');
-        readerDiv.id = 'reader';
-        wrapper.appendChild(readerDiv);
+      // Ensure clean initialization parameters optimized safely for Apple and Android mobile screens
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+          fps: 10, 
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            // Generates a responsive tracking container square matching mobile layouts safely
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            return { width: Math.floor(minEdge * 0.65), height: Math.floor(minEdge * 0.65) };
+          },
+          aspectRatio: 1.0,
+          rememberLastUsedCamera: true,
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        }, false);
       }
       
-      // RESTORED: Your exact signature camera control scanner selection layout properties
-      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
-      html5QrcodeScanner.render(onScanSuccess);
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
     }
 
     function stopAndDestroyCamera() {
       isCameraPaused = true;
       if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().then(() => {
-          let reader = document.getElementById('reader');
-          if (reader) reader.remove();
-        }).catch(() => {
-          let reader = document.getElementById('reader');
-          if (reader) reader.remove();
-        });
+        html5QrcodeScanner.clear().catch(() => { /* Prevent crash cascades */ });
       }
     }
 
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
-      stopAndDestroyCamera();
+      isCameraPaused = true; // Pause tracking registers right away
       
       document.getElementById('ticket-info-box').style.display = "none";
       document.getElementById('close-scanner-btn').style.display = "none";
@@ -179,14 +177,17 @@
       
       timeoutTracker = setTimeout(() => {
         showBanner("Network connection lag detected. Resetting camera stream interface...", "bg-error");
-        setTimeout(() => { initScanner(); }, 3000);
+        setTimeout(() => { isCameraPaused = false; hideBanner(); document.getElementById('close-scanner-btn').style.display = "block"; }, 3000);
       }, 25000);
       
       executeDatabaseLookup(decodedText);
     }
 
+    function onScanFailure(error) {
+      // Keep running silently in background loop while user points at barcode
+    }
+
     function executeDatabaseLookup(ticketCode) {
-      // Secure non-blocking cross-origin network fetch pipeline matching the Vercel architecture rules
       fetch(googleWebAppUrl, {
         method: "POST",
         mode: "no-cors",
@@ -211,7 +212,7 @@
       } else if (response.status === 'invalid') {
         hideBanner(); renderInvalidTicketUI(response.message);
       } else {
-        showBanner(response.message, "bg-error"); resetScannerOrClose(4000, false);
+        showBanner(response.message, "bg-error"); resetScannerOrClose(4000);
       }
     }
 
@@ -249,7 +250,7 @@
 
       let cancelBtn = document.createElement('button');
       cancelBtn.className = "cancel-btn"; cancelBtn.innerText = "Cancel Check-in";
-      cancelBtn.onclick = function() { initScanner(); };
+      cancelBtn.onclick = function() { isCameraPaused = false; document.getElementById('ticket-info-box').style.display = "none"; document.getElementById('close-scanner-btn').style.display = "block"; };
       btnContainer.appendChild(cancelBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
@@ -275,7 +276,7 @@
       
       let backBtn = document.createElement('button');
       backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
-      backBtn.onclick = function() { initScanner(); };
+      backBtn.onclick = function() { isCameraPaused = false; document.getElementById('ticket-info-box').style.display = "none"; document.getElementById('close-scanner-btn').style.display = "block"; };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
@@ -291,7 +292,7 @@
       
       let backBtn = document.createElement('button');
       backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff"; backBtn.innerText = "Scan Next Ticket";
-      backBtn.onclick = function() { initScanner(); };
+      backBtn.onclick = function() { isCameraPaused = false; document.getElementById('ticket-info-box').style.display = "none"; document.getElementById('close-scanner-btn').style.display = "block"; };
       btnContainer.appendChild(backBtn);
       document.getElementById('ticket-info-box').style.display = "block";
     }
@@ -340,7 +341,11 @@
     
     function resetScannerOrClose(delay) {
       setTimeout(() => {
-        initScanner();
+        hideBanner();
+        document.getElementById('ticket-info-box').style.display = "none";
+        document.getElementById('close-scanner-btn').style.display = "block";
+        isCameraPaused = false;
+        activeTicket = null;
       }, delay);
     }
   </script>
