@@ -217,7 +217,12 @@
       
       if (data.historyLog && data.historyLog.trim() !== '') {
         htmlPayload += '<p class="history-log-title">⚠️ Prior Activity Checked-In On This Ticket:</p>';
-        htmlPayload += '<div class="history-log-container">' + data.historyLog.replace(/\\n/g, '<br>') + '</div>';
+        
+        // Splits each historical entry string by its actual newline character
+        // and wraps each entry with a clear HTML line break (<br><br>) for spacing
+        let formattedLog = data.historyLog.split('\n').join('<br><br>');
+        
+        htmlPayload += '<div class="history-log-container">' + formattedLog + '</div>';
       }
 
       document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
