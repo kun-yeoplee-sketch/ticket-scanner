@@ -213,7 +213,7 @@
         let item = data.details[k];
         htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
       }
-      htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#00ff66; font-weight:bold;">' + data.remaining + '</span> (out of ' + data.totalSeats + ' total)</li></ul>';
+      htmlPayload += '<li><strong>Remaining Group Seats:</strong><br><span style="color:#00ff66; font-weight:bold;">' + data.remaining + '</span> (out of ' + data.totalSeats + ' total)</li></ul>';
       
       if (data.historyLog && data.historyLog.trim() !== '') {
         htmlPayload += '<p class="history-log-title">⚠️ Prior Activity Checked-In On This Ticket:</p>';
@@ -252,7 +252,7 @@
         let item = data.details[k];
         htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
       }
-      htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
+      htmlPayload += '<li><strong>Remaining Group Seats:</strong><br><span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
 
       let cleanLogs = data.message ? data.message.split('\n').join('<br><br>') : 'No log entries found.';
       
