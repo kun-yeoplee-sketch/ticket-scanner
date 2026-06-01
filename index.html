@@ -254,7 +254,7 @@
       }
       htmlPayload += '<li><strong>Remaining Group Seats:</strong> <span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
 
-      let cleanLogs = data.message.replace(/\\n/g, '<br>');
+      let cleanLogs = data.message ? data.message.split('\n').join('<br><br>') : 'No log entries found.';
       
       htmlPayload += '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0 15px 0; color: #ffcccc;">';
       htmlPayload += '<strong>This ticket is fully checked-in.</strong>';
