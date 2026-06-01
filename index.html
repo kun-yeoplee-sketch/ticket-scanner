@@ -341,7 +341,7 @@
           .then(res => res.json())
           .then(response => {
             if (response.success) {
-              showManualAlert(response.message || "Admission logged successfully!", true);
+              showManualAlert(response.message || "Logged successfully!", true);
             } else {
               showManualAlert("Error: " + (response.message || "Unknown data write error"), false);
             }
