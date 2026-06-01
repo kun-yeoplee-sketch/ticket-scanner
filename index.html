@@ -201,7 +201,7 @@
 
     function formatMetadataValue(val) {
       if (val === undefined || val === null) return '';
-      return val.toString().replace(/\\n/g, '<br>').replace(/\\r/g, '');
+      return val.toString().replace(/\n/g, '<br>').replace(/\r/g, '');
     }
 
     function renderSelectionUI(data) {
