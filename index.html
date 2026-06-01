@@ -311,7 +311,7 @@
 
       document.getElementById('real-submit-btn').onclick = function() {
         document.getElementById('ticket-info-box').style.display = "none";
-        showBanner("Logging ticket.<br>Please wait...", "bg-info");
+        showBanner("Logging ticket."<br>"Please wait...", "bg-info");
         
         timeoutTracker = setTimeout(() => {
           showBanner("Network write delay. Resetting UI interface loop safely.", "bg-error");
