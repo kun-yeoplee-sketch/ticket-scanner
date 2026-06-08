@@ -183,7 +183,7 @@
 
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
-      
+      if (navigator.vibrate) { navigator.vibrate(100); }
       if (html5QrcodeScanner) {
         try {
           html5QrcodeScanner.pause(true);
