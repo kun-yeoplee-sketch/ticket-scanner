@@ -58,7 +58,7 @@
       </button>
 
       <div class="credits">
-        Developed by Kun-Yeop Lee for exclusive use at official Rangitoto College ticketed events.
+        This scanner was made by Mr Kun-Yeop Lee to be used for official Rangitoto College ticketed events.
       </div>
     </div>
 
@@ -150,8 +150,10 @@
         wrapper.appendChild(readerDiv);
       }
 
-      html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
-      html5QrcodeScanner.render(onScanSuccess);
+      if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+      }
     }
 
     function stopAndDestroyCamera() {
@@ -160,16 +162,27 @@
         html5QrcodeScanner.clear().then(() => {
           let reader = document.getElementById('reader');
           if (reader) reader.remove();
+          html5QrcodeScanner = null;
         }).catch((err) => {
           let reader = document.getElementById('reader');
           if (reader) reader.remove();
+          html5QrcodeScanner = null;
         });
       }
     }
 
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
-      stopAndDestroyCamera();
+      
+      // Pause the scanner interface and freeze the video frame instead of destroying it
+      if (html5QrcodeScanner) {
+        try {
+          html5QrcodeScanner.pause(true);
+        } catch (e) {
+          console.error("Camera pause error:", e);
+        }
+      }
+      isCameraPaused = true;
       
       document.getElementById('ticket-info-box').style.display = "none";
       document.getElementById('close-scanner-btn').style.display = "none";
@@ -218,10 +231,7 @@
       if (data.historyLog && data.historyLog.trim() !== '') {
         htmlPayload += '<p class="history-log-title">⚠️ Prior Activity Checked-In On This Ticket:</p>';
         
-        // Splits each historical entry string by its actual newline character
-        // and wraps each entry with a clear HTML line break (<br><br>) for spacing
         let formattedLog = data.historyLog.split('\n').join('<br><br>');
-        
         htmlPayload += '<div class="history-log-container">' + formattedLog + '</div>';
       }
 
@@ -320,7 +330,6 @@
 
         let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
         
-        // Structured payload to cleanly speak to the Google Apps Script doPost endpoint 
         let payload = {
           action: "processAdmission",
           ticketId: activeTicket.ticketId,
@@ -330,7 +339,6 @@
           ticketSummary: activeTicket.ticketSummary
         };
 
-        // Execution of the clean cross-origin POST verification script sequence
         fetch(googleWebAppUrl, {
           method: "POST",
           headers: {
@@ -380,7 +388,18 @@
           document.getElementById('close-scanner-btn').style.display = "block";
           isCameraPaused = false; 
           activeTicket = null;
-          initScanner();
+          
+          // Resume the active camera session smoothly instead of rebuilding a new container
+          if (html5QrcodeScanner) {
+            try {
+              html5QrcodeScanner.resume();
+            } catch (e) {
+              console.error("Camera resume failed, running fallback re-init:", e);
+              initScanner();
+            }
+          } else {
+            initScanner();
+          }
         }
       }, delay);
     }
