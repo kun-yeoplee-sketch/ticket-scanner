@@ -41,6 +41,9 @@
     .top-logo { max-width: 220px; width: 100%; height: auto; margin: 0 auto 20px auto; display: block; background: #ffffff; padding: 10px; border-radius: 8px; }
     .child-top-logo { max-width: 180px; width: 100%; height: auto; margin: 0 auto 15px auto; display: block; background: #ffffff; padding: 8px; border-radius: 6px; }
     .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
+    
+    /* Smooth transition layout container wrapper for the camera element */
+    #reader-wrapper { transition: opacity 0.2s ease; position: relative; left: 0; opacity: 1; }
   </style>
 </head>
 <body>
@@ -143,7 +146,14 @@
       document.getElementById('close-scanner-btn').style.display = "block";
       hideBanner();
 
+      // Reset layout positioning back to visible status
       let wrapper = document.getElementById('reader-wrapper');
+      if (wrapper) {
+        wrapper.style.position = 'relative';
+        wrapper.style.left = '0';
+        wrapper.style.opacity = '1';
+      }
+
       if (!document.getElementById('reader')) {
         let readerDiv = document.createElement('div');
         readerDiv.id = 'reader';
@@ -174,7 +184,6 @@
     function onScanSuccess(decodedText) {
       if (isCameraPaused) return;
       
-      // Pause the scanner interface and freeze the video frame instead of destroying it
       if (html5QrcodeScanner) {
         try {
           html5QrcodeScanner.pause(true);
@@ -183,6 +192,14 @@
         }
       }
       isCameraPaused = true;
+      
+      // Stealth-hide camera by sliding it off-screen safely (Prevents iOS layout recalculation bug)
+      let wrapper = document.getElementById('reader-wrapper');
+      if (wrapper) {
+        wrapper.style.position = 'absolute';
+        wrapper.style.left = '-9999px';
+        wrapper.style.opacity = '0';
+      }
       
       document.getElementById('ticket-info-box').style.display = "none";
       document.getElementById('close-scanner-btn').style.display = "none";
@@ -389,7 +406,14 @@
           isCameraPaused = false; 
           activeTicket = null;
           
-          // Resume the active camera session smoothly instead of rebuilding a new container
+          // Return the camera window cleanly to the screen page flow before unfreezing stream
+          let wrapper = document.getElementById('reader-wrapper');
+          if (wrapper) {
+            wrapper.style.position = 'relative';
+            wrapper.style.left = '0';
+            wrapper.style.opacity = '1';
+          }
+          
           if (html5QrcodeScanner) {
             try {
               html5QrcodeScanner.resume();
