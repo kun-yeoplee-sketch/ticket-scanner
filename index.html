@@ -212,7 +212,7 @@
       
       let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
 
-      // 🚨 UPDATED: FAIL FAST ON READ - DEVICE HAS NO CONNECTION AT ALL
+      // OFFLINE CHECK 1: DEVICE HAS NO CONNECTION AT ALL (Reject Scan)
       if (!navigator.onLine) {
         showManualAlert("NO NETWORK: Cannot verify ticket. Scan rejected.", false);
         return;
@@ -229,7 +229,7 @@
         .then(res => res.json())
         .then(handleDataResponse)
         .catch(err => { 
-          // 🚨 UPDATED: FAIL FAST ON READ - CONNECTION DROPPED WHILE FETCHING
+          // OFFLINE CHECK 2: CONNECTION DROPPED WHILE FETCHING (Reject Scan)
           clearTimeout(timeoutTracker);
           showManualAlert("Network error. Cannot read database. Ticket NOT saved.", false);
         });
@@ -362,7 +362,7 @@
           })
           .catch(err => {
             clearTimeout(fetchTimeout);
-            // 🚨 SUCCESSFUL WRITE FALLBACK: CONNECTION DROPPED DURING ADMISSION ONLY
+            // OFFLINE CHECK 3: CONNECTION DROPPED DURING WRITE ONLY (Queue Ticket)
             queueTicketOffline(activeTicket.ticketId, count, currentUsher);
           });
       };
@@ -372,7 +372,7 @@
       };
     }
 
-    // --- NEW OFFLINE QUEUE LOGIC ---
+    // --- OFFLINE QUEUE LOGIC ---
     
     function queueTicketOffline(ticketId, count, usherName) {
       clearTimeout(timeoutTracker);
@@ -383,14 +383,14 @@
         return;
       }
 
-      // Add to local array
+      // Add to local array - Notice the ticketSummary flag below!
       offlineQueue.push({
         action: "processAdmission",
         ticketId: ticketId,
-        rowIndex: null, // Sheet script must use ticketId to find the row, not index
+        rowIndex: null, 
         count: count,
         usherName: usherName,
-        ticketSummary: "Processed Offline",
+        ticketSummary: "Processed Offline", // <--- THE TRIGGER FOR THE BACKEND FIX
         timestamp: new Date().toISOString()
       });
 
