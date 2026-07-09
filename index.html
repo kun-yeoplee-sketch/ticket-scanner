@@ -212,9 +212,9 @@
       
       let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
 
-      // OFFLINE CHECK 1: DEVICE HAS NO CONNECTION AT ALL
+      // 🚨 UPDATED: FAIL FAST ON READ - DEVICE HAS NO CONNECTION AT ALL
       if (!navigator.onLine) {
-        queueTicketOffline(decodedText, 1, currentUsher);
+        showManualAlert("NO NETWORK: Cannot verify ticket. Scan rejected.", false);
         return;
       }
 
@@ -229,9 +229,9 @@
         .then(res => res.json())
         .then(handleDataResponse)
         .catch(err => { 
-          // OFFLINE CHECK 2: CONNECTION DROPPED WHILE FETCHING
+          // 🚨 UPDATED: FAIL FAST ON READ - CONNECTION DROPPED WHILE FETCHING
           clearTimeout(timeoutTracker);
-          queueTicketOffline(decodedText, 1, currentUsher);
+          showManualAlert("Network error. Cannot read database. Ticket NOT saved.", false);
         });
     }
 
@@ -362,7 +362,7 @@
           })
           .catch(err => {
             clearTimeout(fetchTimeout);
-            // OFFLINE CHECK 3: CONNECTION DROPPED OR SHEET CHOKED DURING WRITE
+            // 🚨 SUCCESSFUL WRITE FALLBACK: CONNECTION DROPPED DURING ADMISSION ONLY
             queueTicketOffline(activeTicket.ticketId, count, currentUsher);
           });
       };
