@@ -33,6 +33,9 @@
     .bg-error { background-color: #c62828 !important; color: white; }
     .bg-info { background-color: #1565c0 !important; color: white; }
     
+    /* Offline Badge Styles */
+    #offline-badge { background-color: #ff9800; color: #000; font-weight: bold; padding: 10px; border-radius: 6px; margin: 10px 0; display: none; font-size: 1.1rem; }
+    
     ul { list-style-type: none; padding-left: 0; margin-bottom: 15px; }
     li { margin-bottom: 6px; border-bottom: 1px solid #3a3a4a; padding-bottom: 6px; font-size: 1.05rem; }
     .history-log-title { font-weight: bold; margin-top: 20px; margin-bottom: 5px; color: #aaa; font-size: 0.95rem; }
@@ -42,7 +45,6 @@
     .child-top-logo { max-width: 180px; width: 100%; height: auto; margin: 0 auto 15px auto; display: block; background: #ffffff; padding: 8px; border-radius: 6px; }
     .credits { margin-top: 35px; font-size: 0.78rem; color: #888899; line-height: 1.4; border-top: 1px solid #3a3a4a; padding-top: 15px; }
     
-    /* Smooth transition layout container wrapper for the camera element */
     #reader-wrapper { transition: opacity 0.2s ease; position: relative; left: 0; opacity: 1; }
   </style>
 </head>
@@ -70,6 +72,8 @@
       <h4 id="child-header-title">Ticket Scanner</h4>
       <p style="font-size: 0.85rem; color: #aaa; margin-top: -10px;">Scanner: <strong id="active-scanner-label" style="color:#00ff66;">Unknown</strong></p>
       
+      <div id="offline-badge">Offline Sync Queue: 0</div>
+      
       <div id="reader-wrapper">
         <div id="reader"></div>
       </div>
@@ -94,6 +98,9 @@
     let timeoutTracker = null;
     let googleWebAppUrl = "";
     let globalEventName = "Ticket Scanner";
+    
+    // OFFLINE QUEUE INITIALIZATION
+    let offlineQueue = JSON.parse(localStorage.getItem("offlineScansQueue")) || [];
 
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -119,6 +126,11 @@
             document.getElementById('child-header-title').innerText = globalEventName;
           }
         }).catch(() => {});
+        
+      // Initialize Network Listeners for Auto-Sync
+      window.addEventListener("online", syncOfflineQueueToServer);
+      setInterval(syncOfflineQueueToServer, 10000); // Check every 10 seconds
+      updateQueueUI();
     };
 
     function switchViewToScanner() {
@@ -146,7 +158,6 @@
       document.getElementById('close-scanner-btn').style.display = "block";
       hideBanner();
 
-      // Reset layout positioning back to visible status
       let wrapper = document.getElementById('reader-wrapper');
       if (wrapper) {
         wrapper.style.position = 'relative';
@@ -185,15 +196,10 @@
       if (isCameraPaused) return;
       if (navigator.vibrate) { navigator.vibrate(100); }
       if (html5QrcodeScanner) {
-        try {
-          html5QrcodeScanner.pause(true);
-        } catch (e) {
-          console.error("Camera pause error:", e);
-        }
+        try { html5QrcodeScanner.pause(true); } catch (e) { console.error("Camera pause error:", e); }
       }
       isCameraPaused = true;
       
-      // Stealth-hide camera by sliding it off-screen safely (Prevents iOS layout recalculation bug)
       let wrapper = document.getElementById('reader-wrapper');
       if (wrapper) {
         wrapper.style.position = 'absolute';
@@ -203,17 +209,30 @@
       
       document.getElementById('ticket-info-box').style.display = "none";
       document.getElementById('close-scanner-btn').style.display = "none";
-      showBanner("Loading...", "bg-info");
+      
+      let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
+
+      // OFFLINE CHECK 1: DEVICE HAS NO CONNECTION AT ALL
+      if (!navigator.onLine) {
+        queueTicketOffline(decodedText, 1, currentUsher);
+        return;
+      }
+
+      showBanner("Checking ticket details...", "bg-info");
       
       timeoutTracker = setTimeout(() => {
-        showBanner("Network lag detected. Resetting interface stream interface...", "bg-error");
+        showBanner("Network lag detected. Resetting interface...", "bg-error");
         setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
-      }, 25000);
+      }, 15000);
       
       fetch(googleWebAppUrl + "?ticketId=" + encodeURIComponent(decodedText) + "&action=check")
         .then(res => res.json())
         .then(handleDataResponse)
-        .catch(err => { showManualAlert("Network reading loop error: " + err.message, false); });
+        .catch(err => { 
+          // OFFLINE CHECK 2: CONNECTION DROPPED WHILE FETCHING
+          clearTimeout(timeoutTracker);
+          queueTicketOffline(decodedText, 1, currentUsher);
+        });
     }
 
     function handleDataResponse(response) {
@@ -247,7 +266,6 @@
       
       if (data.historyLog && data.historyLog.trim() !== '') {
         htmlPayload += '<p class="history-log-title">⚠️ Prior Activity Checked-In On This Ticket:</p>';
-        
         let formattedLog = data.historyLog.split('\n').join('<br><br>');
         htmlPayload += '<div class="history-log-container">' + formattedLog + '</div>';
       }
@@ -273,30 +291,12 @@
     function renderEmptyHistoryUI(data) {
       document.getElementById('box-header').innerText = "No Seats Remaining";
       document.getElementById('box-header').style.color = "#ff5555";
-
-      let htmlPayload = "<ul>";
-      for (let k = 0; k < data.details.length; k++) {
-        let item = data.details[k];
-        htmlPayload += '<li><strong>' + item.label + ':</strong><br>' + formatMetadataValue(item.value) + '</li>';
-      }
-      htmlPayload += '<li><strong>Remaining Group Seats:</strong><br><span style="color:#ff5555; font-weight:bold;">0</span> (out of ' + data.totalSeats + ' total)</li></ul>';
-
-      let cleanLogs = data.message ? data.message.split('\n').join('<br><br>') : 'No log entries found.';
+      document.getElementById('dynamic-metadata').innerHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0; color: #ffcccc;"><strong>This ticket is fully checked-in.</strong></div>';
       
-      htmlPayload += '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0 15px 0; color: #ffcccc;">';
-      htmlPayload += '<strong>This ticket is fully checked-in.</strong>';
-      htmlPayload += '</div>';
-      htmlPayload += '<p style="font-weight: bold; margin-bottom: 5px; color: #aaa;">Entry Log History:</p>';
-      htmlPayload += '<div style="font-size: 0.95rem; line-height: 1.5; background: #1a1a22; padding: 12px; border-radius: 6px; border: 1px solid #333; margin-bottom: 10px; color: #ffcccc;">';
-      htmlPayload += cleanLogs;
-      htmlPayload += '</div>';
-
-      document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
       let btnContainer = document.getElementById('button-container');
       btnContainer.innerHTML = '';
       let backBtn = document.createElement('button');
-      backBtn.className = "back-btn";
-      backBtn.style.backgroundColor = "#007bff";
+      backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff";
       backBtn.innerText = "Scan Next Ticket";
       backBtn.onclick = function() { resetScannerOrClose(0, false); };
       btnContainer.appendChild(backBtn);
@@ -306,18 +306,12 @@
     function renderInvalidTicketUI(errorMessage) {
       document.getElementById('box-header').innerText = "Invalid Ticket";
       document.getElementById('box-header').style.color = "#ff5555";
+      document.getElementById('dynamic-metadata').innerHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin-bottom: 15px; color: #ffcccc;"><strong>UNRECOGNIZED QR CODE</strong><br>' + errorMessage + '</div>';
       
-      let invalidHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin-bottom: 15px; color: #ffcccc; text-align: left;">';
-      invalidHTML += '<strong>UNRECOGNIZED QR CODE</strong><br>';
-      invalidHTML += errorMessage;
-      invalidHTML += '</div>';
-      
-      document.getElementById('dynamic-metadata').innerHTML = invalidHTML;
       let btnContainer = document.getElementById('button-container');
       btnContainer.innerHTML = '';
       let backBtn = document.createElement('button');
-      backBtn.className = "back-btn";
-      backBtn.style.backgroundColor = "#007bff";
+      backBtn.className = "back-btn"; backBtn.style.backgroundColor = "#007bff";
       backBtn.innerText = "Scan Next Ticket";
       backBtn.onclick = function() { resetScannerOrClose(0, false); };
       btnContainer.appendChild(backBtn);
@@ -326,11 +320,7 @@
 
     function renderConfirmationUI(count) {
       let btnContainer = document.getElementById('button-container');
-      
-      let confirmHTML = '<div style="text-align:center; padding:15px; background:#3a3a4a; border-radius:8px; border: 2px solid #ff9800; margin-bottom:15px;">';
-      confirmHTML += '<h4 style="color:#ff9800; margin-bottom:5px; font-weight:bold;">Confirm Entry</h4>';
-      confirmHTML += '<p style="margin:0; font-size:1.25rem;">Are you sure you want to admit <strong>' + count + '</strong>?</p>';
-      confirmHTML += '</div>';
+      let confirmHTML = '<div style="text-align:center; padding:15px; background:#3a3a4a; border-radius:8px; border: 2px solid #ff9800; margin-bottom:15px;"><h4 style="color:#ff9800; margin-bottom:5px; font-weight:bold;">Confirm Entry</h4><p style="margin:0; font-size:1.25rem;">Are you sure you want to admit <strong>' + count + '</strong>?</p></div>';
       confirmHTML += '<button id="real-submit-btn" class="confirm-btn">Yes - Submit</button>';
       confirmHTML += '<button id="back-btn" class="back-btn">No - Go back</button>';
 
@@ -340,11 +330,10 @@
         document.getElementById('ticket-info-box').style.display = "none";
         showBanner("Logging ticket. Please wait...", "bg-info");
         
-        timeoutTracker = setTimeout(() => {
-          showBanner("Network write delay. Resetting UI interface loop safely.", "bg-error");
-          setTimeout(() => { resetScannerOrClose(0, false); }, 3000);
-        }, 25000);
-
+        // Timeout Abort Controller ensures we don't hang if the network freezes mid-write
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 6000); // 6 Sec Hard Cutoff
+        
         let currentUsher = document.getElementById('usher-name').value.trim() || "Unknown Scanner";
         
         let payload = {
@@ -358,13 +347,13 @@
 
         fetch(googleWebAppUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-          },
-          body: JSON.stringify(payload)
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload),
+          signal: controller.signal
         })
           .then(res => res.json())
           .then(response => {
+            clearTimeout(fetchTimeout);
             if (response.success) {
               showManualAlert(response.message || "Logged successfully!", true);
             } else {
@@ -372,7 +361,9 @@
             }
           })
           .catch(err => {
-            showManualAlert("Database write failure: " + err.message, false);
+            clearTimeout(fetchTimeout);
+            // OFFLINE CHECK 3: CONNECTION DROPPED OR SHEET CHOKED DURING WRITE
+            queueTicketOffline(activeTicket.ticketId, count, currentUsher);
           });
       };
 
@@ -380,6 +371,73 @@
         renderSelectionUI(activeTicket);
       };
     }
+
+    // --- NEW OFFLINE QUEUE LOGIC ---
+    
+    function queueTicketOffline(ticketId, count, usherName) {
+      clearTimeout(timeoutTracker);
+
+      // Prevent exact same ticket from being queued twice while offline
+      if (offlineQueue.some(item => item.ticketId === ticketId)) {
+        showManualAlert("ALREADY SCANNED (Sitting in offline queue)", false);
+        return;
+      }
+
+      // Add to local array
+      offlineQueue.push({
+        action: "processAdmission",
+        ticketId: ticketId,
+        rowIndex: null, // Sheet script must use ticketId to find the row, not index
+        count: count,
+        usherName: usherName,
+        ticketSummary: "Processed Offline",
+        timestamp: new Date().toISOString()
+      });
+
+      // Commit to physical device memory
+      localStorage.setItem("offlineScansQueue", JSON.stringify(offlineQueue));
+      updateQueueUI();
+      
+      showManualAlert("NO NETWORK: Saved securely to device!", true);
+    }
+
+    async function syncOfflineQueueToServer() {
+      if (!navigator.onLine || offlineQueue.length === 0) return;
+      
+      let itemsToProcess = [...offlineQueue];
+      
+      for (let payload of itemsToProcess) {
+        try {
+          const response = await fetch(googleWebAppUrl, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+          }).then(res => res.json());
+
+          // If Apps script successfully processes it, remove it from device memory
+          if (response.success || (response.message && response.message.toLowerCase().includes("already"))) {
+            offlineQueue = offlineQueue.filter(item => item.ticketId !== payload.ticketId);
+            localStorage.setItem("offlineScansQueue", JSON.stringify(offlineQueue));
+            updateQueueUI();
+          }
+        } catch (err) {
+          console.warn("Sync interrupted. Pausing queue.");
+          break; 
+        }
+      }
+    }
+
+    function updateQueueUI() {
+      let badge = document.getElementById('offline-badge');
+      if (offlineQueue.length > 0) {
+        badge.innerText = `⚠️ Offline Sync Queue: ${offlineQueue.length} pending`;
+        badge.style.display = "block";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+
+    // --- EXISTING HELPER LOGIC ---
 
     function showBanner(text, cssClass) {
       let b = document.getElementById('status-banner');
@@ -406,7 +464,6 @@
           isCameraPaused = false; 
           activeTicket = null;
           
-          // Return the camera window cleanly to the screen page flow before unfreezing stream
           let wrapper = document.getElementById('reader-wrapper');
           if (wrapper) {
             wrapper.style.position = 'relative';
@@ -415,12 +472,8 @@
           }
           
           if (html5QrcodeScanner) {
-            try {
-              html5QrcodeScanner.resume();
-            } catch (e) {
-              console.error("Camera resume failed, running fallback re-init:", e);
-              initScanner();
-            }
+            try { html5QrcodeScanner.resume(); } 
+            catch (e) { initScanner(); }
           } else {
             initScanner();
           }
