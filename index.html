@@ -291,7 +291,17 @@
     function renderEmptyHistoryUI(data) {
       document.getElementById('box-header').innerText = "No Seats Remaining";
       document.getElementById('box-header').style.color = "#ff5555";
-      document.getElementById('dynamic-metadata').innerHTML = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 20px 0; color: #ffcccc;"><strong>This ticket is fully checked-in.</strong></div>';
+      
+      let htmlPayload = '<div style="background-color: #3d2424; padding: 15px; border-radius: 6px; border-left: 4px solid #ff5555; margin: 15px 0; color: #ffcccc;"><strong>This ticket is fully checked-in.</strong></div>';
+      
+      // Pull the history log from the backend message and format it
+      if (data.message && data.message.trim() !== '') {
+        htmlPayload += '<p class="history-log-title">⚠️ Prior Check-in History:</p>';
+        let formattedLog = data.message.split('\n').join('<br><br>');
+        htmlPayload += '<div class="history-log-container">' + formattedLog + '</div>';
+      }
+      
+      document.getElementById('dynamic-metadata').innerHTML = htmlPayload;
       
       let btnContainer = document.getElementById('button-container');
       btnContainer.innerHTML = '';
